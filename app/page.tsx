@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import productsData from "@/data/products.json";
+import productsJson from "@/data/products.json";
 
 // ── ตั้งชื่อพนักงานที่นี่ ───────────────────
 const STAFF_LIST = ["อ้อม", "ปาล์ม"];
@@ -50,7 +50,8 @@ interface DailySummaryData {
 }
 
 export default function POSPage() {
-  const [products] = useState<Product[]>(productsData);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -120,6 +121,30 @@ export default function POSPage() {
     const saved = localStorage.getItem("pos_staff");
     if (saved) setStaff(saved);
     setStaffLoaded(true);
+  }, []);
+
+  // โหลดสินค้าจาก Google Sheets (fallback เป็น local JSON)
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const res = await fetch("/api/products");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.products && data.products.length > 0) {
+            setProducts(data.products);
+          } else {
+            setProducts(productsJson as Product[]);
+          }
+        } else {
+          setProducts(productsJson as Product[]);
+        }
+      } catch {
+        setProducts(productsJson as Product[]);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+    loadProducts();
   }, []);
 
   const selectStaff = (name: string) => {
@@ -550,54 +575,122 @@ export default function POSPage() {
           style={{ scrollbarWidth: "none" }}
         >
           <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
-            {products.map((p, i) => {
-              const inCart = cartItemFor(p.sku_code);
-              return (
-                <button
-                  key={p.sku_code}
-                  onClick={() => addToCart(p)}
-                  className="group relative flex flex-col rounded-xl sm:rounded-2xl overflow-hidden
+            {productsLoading ? (
+              <>
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col rounded-xl sm:rounded-2xl overflow-hidden bg-[#111827] border border-white/[0.04]"
+                    style={{
+                      animation: `fade-in-up .4s ease both`,
+                      animationDelay: `${i * 30}ms`,
+                    }}
+                  >
+                    <div className="aspect-square w-full bg-[#0d1117] animate-pulse" />
+                    <div className="p-2 sm:p-3 space-y-2">
+                      <div className="h-3 bg-white/[0.04] rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-white/[0.06] rounded animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : products.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-600">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-12 h-12 mb-3 opacity-30"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m7.5 4.27 9 5.15" />
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                  <path d="m3.3 7 8.7 5 8.7-5" />
+                  <path d="M12 22V12" />
+                </svg>
+                <p className="text-sm font-medium">ไม่พบสินค้า</p>
+              </div>
+            ) : (
+              products.map((p, i) => {
+                const inCart = cartItemFor(p.sku_code);
+                return (
+                  <button
+                    key={p.sku_code}
+                    onClick={() => addToCart(p)}
+                    className="group relative flex flex-col rounded-xl sm:rounded-2xl overflow-hidden
                     bg-[#111827] border border-white/[0.04]
                     hover:border-cyan-500/30 hover:shadow-[0_0_24px_-4px_rgba(34,211,238,0.15)]
                     active:scale-[0.97] transition-all duration-200 text-left"
-                  style={{
-                    animation: `fade-in-up .4s ease both`,
-                    animationDelay: `${i * 20}ms`,
-                  }}
-                >
-                  {/* qty badge */}
-                  {inCart && (
-                    <span className="absolute top-1.5 right-1.5 sm:top-2.5 sm:right-2.5 z-10 min-w-[20px] sm:min-w-[24px] h-5 sm:h-6 px-1 sm:px-1.5 flex items-center justify-center rounded-full bg-cyan-500 text-[10px] sm:text-[11px] font-bold text-white shadow-lg shadow-cyan-500/30">
-                      {inCart.qty}
-                    </span>
-                  )}
-
-                  {/* image */}
-                  <div className="relative aspect-square w-full bg-[#0d1117] overflow-hidden">
-                    <img
-                      src={p.image}
-                      alt={p.name}
-                      className="w-full h-full object-contain p-2 sm:p-4
-                        group-hover:scale-110 transition-transform duration-500"
-                      loading="lazy"
-                    />
-                  </div>
-
-                  {/* info */}
-                  <div className="p-2 sm:p-3 flex flex-col gap-0.5 sm:gap-1">
-                    <h3 className="text-[11px] sm:text-[13px] font-semibold leading-snug text-slate-300 line-clamp-2 group-hover:text-white transition-colors">
-                      {p.name}
-                    </h3>
-                    <p className="text-sm sm:text-lg font-extrabold text-white flex items-baseline gap-0.5">
-                      {p.price.toLocaleString()}
-                      <span className="text-[10px] sm:text-[11px] font-medium text-cyan-400">
-                        ฿
+                    style={{
+                      animation: `fade-in-up .4s ease both`,
+                      animationDelay: `${i * 20}ms`,
+                    }}
+                  >
+                    {/* qty badge */}
+                    {inCart && (
+                      <span className="absolute top-1.5 right-1.5 sm:top-2.5 sm:right-2.5 z-10 min-w-[20px] sm:min-w-[24px] h-5 sm:h-6 px-1 sm:px-1.5 flex items-center justify-center rounded-full bg-cyan-500 text-[10px] sm:text-[11px] font-bold text-white shadow-lg shadow-cyan-500/30">
+                        {inCart.qty}
                       </span>
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+                    )}
+
+                    {/* image */}
+                    <div className="relative aspect-square w-full bg-[#0d1117] overflow-hidden flex items-center justify-center">
+                      {p.image ? (
+                        <img
+                          src={p.image}
+                          alt={p.name}
+                          className="w-full h-full object-contain p-2 sm:p-4
+                          group-hover:scale-110 transition-transform duration-500"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display =
+                              "none";
+                            (e.target as HTMLImageElement)
+                              .parentElement!.querySelector(".img-fallback")
+                              ?.classList.remove("hidden");
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`img-fallback ${p.image ? "hidden" : ""} absolute inset-0 flex items-center justify-center`}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="w-8 h-8 text-slate-700"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="m7.5 4.27 9 5.15" />
+                          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                          <path d="m3.3 7 8.7 5 8.7-5" />
+                          <path d="M12 22V12" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* info */}
+                    <div className="p-2 sm:p-3 flex flex-col gap-0.5 sm:gap-1">
+                      <h3 className="text-[11px] sm:text-[13px] font-semibold leading-snug text-slate-300 line-clamp-2 group-hover:text-white transition-colors">
+                        {p.name}
+                      </h3>
+                      <p className="text-sm sm:text-lg font-extrabold text-white flex items-baseline gap-0.5">
+                        {p.price.toLocaleString()}
+                        <span className="text-[10px] sm:text-[11px] font-medium text-cyan-400">
+                          ฿
+                        </span>
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
         </main>
 
