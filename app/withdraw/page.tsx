@@ -272,8 +272,7 @@ export default function WithdrawPage() {
                           </div>
                         );
                       } else {
-                        // ── ขั้นที่ 2: เบิกไปขายหน้าร้าน (แกะแบ่ง) ──
-                        // คำนวณจำนวนที่เบิกมาจากคลัง (ขั้นที่ 1) เพื่อแสดงให้เห็น
+                        // ── ขั้นที่ 2: เบิกไปขายหน้าร้าน (กรอกเป็นชิ้น) ──
                         const totalFromWarehouse = entry.withdraw_crate + entry.withdraw_pack + entry.withdraw;
 
                         return (
@@ -299,25 +298,14 @@ export default function WithdrawPage() {
                               </div>
                             </div>
 
-                            {/* แกะแบ่งไปขายหน้าร้าน */}
+                            {/* เบิกไปขายหน้าร้าน - กรอกเป็นชิ้น */}
                             <div className="p-3 sm:p-4 lg:p-6">
                               <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                                 <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
-                                <span className="text-[10px] sm:text-[11px] lg:text-xs font-bold text-amber-400 uppercase tracking-wider">แกะแบ่งไปขายหน้าร้าน</span>
+                                <span className="text-[10px] sm:text-[11px] lg:text-xs font-bold text-amber-400 uppercase tracking-wider">เบิกไปขายหน้าร้าน</span>
                               </div>
-                              <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:gap-4">
-                                <div>
-                                  <InputCell label="ลัง → แพ็ค" value={displayValue(entry.split_crate)} disabled={!hasCrate} onChange={(v) => updateItem(p.sku_code, "split_crate", numericValue(v))} color="amber" />
-                                  {hasCrate && entry.split_crate > 0 && (
-                                    <p className="text-[8px] sm:text-[10px] text-amber-500 font-bold text-center mt-0.5 sm:mt-1">= +{entry.split_crate * p.packs_per_crate!} แพ็ค</p>
-                                  )}
-                                </div>
-                                <div>
-                                  <InputCell label="แพ็ค → ชิ้น" value={displayValue(entry.split_pack)} disabled={!hasPack} onChange={(v) => updateItem(p.sku_code, "split_pack", numericValue(v))} color="amber" />
-                                  {hasPack && entry.split_pack > 0 && (
-                                    <p className="text-[8px] sm:text-[10px] text-amber-500 font-bold text-center mt-0.5 sm:mt-1">= +{entry.split_pack * p.pieces_per_pack!} ชิ้น</p>
-                                  )}
-                                </div>
+                              <div className="max-w-[200px]">
+                                <InputCell label="จำนวน (ชิ้น)" value={displayValue(entry.split_pack)} onChange={(v) => updateItem(p.sku_code, "split_pack", numericValue(v))} color="amber" />
                               </div>
                             </div>
                           </div>

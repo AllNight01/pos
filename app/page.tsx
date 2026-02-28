@@ -156,13 +156,13 @@ export default function POSPage() {
 
       <main className="flex-1 flex overflow-hidden">
         {/* Product Grid */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-8 max-h-[85dvh]" style={{ scrollbarWidth: "none" }}>
+        <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-8" style={{ scrollbarWidth: "none" }}>
           {productsLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
-               {[...Array(10)].map((_, i) => <div key={i} className="aspect-[3/4] rounded-2xl sm:rounded-[32px] bg-white/[0.02] animate-pulse" />)}
+            <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-6">
+               {[...Array(12)].map((_, i) => <div key={i} className="aspect-[3/4] rounded-xl sm:rounded-[32px] bg-white/[0.02] animate-pulse" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+            <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4 lg:gap-6 pb-24 lg:pb-4">
               {products
                 .filter(p => p.price > 0)
                 .map((p) => (
@@ -187,18 +187,18 @@ export default function POSPage() {
 
       {/* Mobile Cart Bar - Floating */}
       {cart.length > 0 && (
-        <div className="lg:hidden fixed bottom-6 inset-x-4 sm:inset-x-6 z-40">
+        <div className="lg:hidden fixed bottom-4 inset-x-3 sm:inset-x-6 z-40">
            <button 
              onClick={() => setShowMobileCart(true)}
-             className="w-full bg-linear-to-r from-cyan-400 to-blue-600 text-white p-4 sm:p-5 lg:p-6 rounded-2xl sm:rounded-[32px] shadow-[0_20px_60px_-15px_rgba(6,182,212,0.5)] flex items-center justify-between font-black text-lg sm:text-xl lg:text-2xl active:scale-95 transition-all outline-none"
+             className="w-full bg-linear-to-r from-cyan-400 to-blue-600 text-white px-4 py-3 sm:p-5 rounded-xl sm:rounded-[32px] shadow-[0_20px_60px_-15px_rgba(6,182,212,0.5)] flex items-center justify-between font-black active:scale-[0.97] transition-all outline-none"
            >
-              <div className="flex items-center gap-3 sm:gap-4">
-                <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm tabular-nums">{cart.length}</span>
-                <span className="tracking-tight uppercase text-sm sm:text-base lg:text-lg">รายการสินค้า</span>
+              <div className="flex items-center gap-2.5 sm:gap-4">
+                <span className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-white/20 flex items-center justify-center text-[10px] sm:text-sm tabular-nums">{cart.length}</span>
+                <span className="tracking-tight uppercase text-xs sm:text-base">รายการสินค้า</span>
               </div>
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="font-mono text-lg sm:text-xl">{totalPrice.toLocaleString()}</span>
-                <span className="text-xs sm:text-sm opacity-80 uppercase">฿</span>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <span className="font-mono text-base sm:text-xl">{totalPrice.toLocaleString()}</span>
+                <span className="text-[10px] sm:text-sm opacity-80">฿</span>
               </div>
            </button>
         </div>
@@ -208,16 +208,26 @@ export default function POSPage() {
       {showMobileCart && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setShowMobileCart(false)} />
-          <div className="absolute inset-x-0 bottom-0 h-[92vh] rounded-t-[40px] sm:rounded-t-[50px] overflow-hidden bg-[#0b0f19] border-t border-white/10 flex flex-col shadow-2xl">
-             <div className="w-10 h-1.5 sm:w-12 bg-white/10 rounded-full mx-auto mt-3 sm:mt-4 mb-1 sm:mb-2 shrink-0" />
-             <CartSidebar
-                cart={cart}
-                addToCart={addToCart}
-                removeFromCart={removeFromCart}
-                clearCart={() => setCart([])}
-                totalPrice={totalPrice}
-                openCheckout={openCheckout}
-              />
+          <div
+            className="absolute inset-x-0 bottom-0 rounded-t-3xl sm:rounded-t-[50px] overflow-hidden bg-[#0b0f19] border-t border-white/10 shadow-2xl"
+            style={{
+              height: "88dvh",
+              display: "flex",
+              flexDirection: "column",
+              animation: "slide-up .35s cubic-bezier(0.16, 1, 0.3, 1) both",
+            }}
+          >
+             <div className="w-10 h-1 sm:w-12 bg-white/10 rounded-full mx-auto mt-2.5 sm:mt-4 mb-0.5 sm:mb-2 shrink-0" />
+             <div className="flex-1 min-h-0">
+               <CartSidebar
+                  cart={cart}
+                  addToCart={addToCart}
+                  removeFromCart={removeFromCart}
+                  clearCart={() => setCart([])}
+                  totalPrice={totalPrice}
+                  openCheckout={openCheckout}
+                />
+             </div>
           </div>
         </div>
       )}
