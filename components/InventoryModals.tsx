@@ -77,7 +77,7 @@ export const InventoryModals: React.FC<InventoryModalsProps> = ({
                   if (await saveInventory(items)) setShowWithdrawModal(false);
                 }}
                 disabled={loading}
-                className="w-full py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 font-bold text-white shadow-xl shadow-cyan-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full py-4 rounded-2xl bg-linear-to-r from-cyan-500 to-blue-500 font-bold text-white shadow-xl shadow-cyan-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 {loading ? "กำลังบันทึก..." : "บันทึกยอดเบิกเพิ่ม"}
               </button>
