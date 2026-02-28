@@ -6,13 +6,13 @@ import { JWT } from "google-auth-library";
 const HEADERS = [
   "เวลา",
   "บิล",
-  "พนักงาน",
   "รหัสสินค้า",
   "ชื่อสินค้า",
   "จำนวน",
   "ราคาต่อชิ้น",
   "ราคารวม",
   "ยอดรวมทั้งบิล",
+  "การชำระเงิน",
   "รับเงิน",
   "เงินทอน",
 ];
@@ -57,7 +57,8 @@ function billId() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { items, total, received, change, staff } = body;
+    const { items, total, received, change, staff, paymentMethod } = body;
+
 
     const serviceAccountAuth = new JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -83,18 +84,64 @@ export async function POST(req: Request) {
     const rows = items.map((item: any) => ({
       เวลา: timeStr,
       บิล: bill,
-      พนักงาน: staff || "",
       รหัสสินค้า: item.sku_code || "",
       ชื่อสินค้า: item.name,
       จำนวน: item.qty,
       ราคาต่อชิ้น: item.price,
       ราคารวม: item.price * item.qty,
       ยอดรวมทั้งบิล: total,
+      การชำระเงิน: paymentMethod || "เงินสด",
       รับเงิน: received,
       เงินทอน: change,
     }));
 
-    await sheet.addRows(rows);
+    const addedRows = await sheet.addRows(rows);
+
+    // Color alternating bills
+    try {
+      if (addedRows.length > 0) {
+        const firstAddedRowIndex = addedRows[0].rowNumber - 1;
+        const lastAddedRowIndex = addedRows[addedRows.length - 1].rowNumber - 1;
+
+        let useGray = false;
+        if (firstAddedRowIndex > 0) {
+          // Load the cell JUST ABOVE the first added row to check its color
+          await sheet.loadCells({
+            startRowIndex: firstAddedRowIndex - 1,
+            endRowIndex: firstAddedRowIndex,
+            startColumnIndex: 0,
+            endColumnIndex: 1,
+          });
+          const prevCell = sheet.getCell(firstAddedRowIndex - 1, 0);
+          const prevColor = prevCell.userEnteredFormat?.backgroundColor;
+          
+          // If previous row is NOT gray (i.e. it's white or undefined), use gray for this bill
+          if (!prevColor || (prevColor.red === 1 && prevColor.green === 1 && prevColor.blue === 1)) {
+            useGray = true;
+          }
+        }
+
+        if (useGray) {
+          await sheet.loadCells({
+            startRowIndex: firstAddedRowIndex,
+            endRowIndex: lastAddedRowIndex + 1,
+            startColumnIndex: 0,
+            endColumnIndex: HEADERS.length,
+          });
+          for (let r = firstAddedRowIndex; r <= lastAddedRowIndex; r++) {
+            for (let c = 0; c < HEADERS.length; c++) {
+              const cell = sheet.getCell(r, c);
+              cell.backgroundColorStyle = {
+                rgbColor: { red: 0.96, green: 0.96, blue: 0.98 },
+              };
+            }
+          }
+          await sheet.saveUpdatedCells();
+        }
+      }
+    } catch (err) {
+      console.error("Formatting error (non-critical):", err);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

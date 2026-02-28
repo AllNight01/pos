@@ -16,31 +16,20 @@ export async function GET() {
     );
     await doc.loadInfo();
 
-    // Get all sheet titles that match dd-MM-yyyy format
-    const datePattern = /^\d{2}-\d{2}-\d{4}$/;
-    const dates: string[] = [];
-
-    for (const sheet of doc.sheetsByIndex) {
-      if (datePattern.test(sheet.title)) {
-        dates.push(sheet.title);
-      }
-    }
-
-    // Sort dates newest first (parse dd-MM-yyyy for proper sorting)
-    dates.sort((a, b) => {
-      const [da, ma, ya] = a.split("-").map(Number);
-      const [db, mb, yb] = b.split("-").map(Number);
-      const dateA = new Date(ya, ma - 1, da);
-      const dateB = new Date(yb, mb - 1, db);
-      return dateB.getTime() - dateA.getTime();
-    });
+    // Get all sheet titles, filter those formatted as dd-mm-yyyy
+    const dates = doc.sheetsByIndex
+      .map((s) => s.title)
+      .filter((title) => /^\d{2}-\d{2}-\d{4}$/.test(title))
+      .sort((a, b) => {
+        // Sort newest first: dd-mm-yyyy
+        const [d1, m1, y1] = a.split("-").map(Number);
+        const [d2, m2, y2] = b.split("-").map(Number);
+        return new Date(y2, m2 - 1, d2).getTime() - new Date(y1, m1 - 1, d1).getTime();
+      });
 
     return NextResponse.json({ success: true, dates });
   } catch (error: any) {
     console.error("Available dates error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

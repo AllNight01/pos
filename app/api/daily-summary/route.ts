@@ -11,7 +11,6 @@ interface SummaryItem {
 }
 
 interface StaffSummary {
-  name: string;
   bills: number;
   revenue: number;
 }
@@ -19,9 +18,9 @@ interface StaffSummary {
 interface BillDetail {
   billId: string;
   time: string;
-  staff: string;
   total: number;
   itemCount: number;
+  paymentMethod: string;
 }
 
 export async function GET(req: Request) {
@@ -74,25 +73,22 @@ export async function GET(req: Request) {
 
     // Aggregate by product
     const itemMap = new Map<string, SummaryItem>();
-    // Aggregate by staff
-    const staffMap = new Map<string, { bills: Set<string>; revenue: number }>();
-    // Aggregate by bill
     const billMap = new Map<
       string,
-      { time: string; staff: string; total: number; itemCount: number }
+      { time: string; total: number; itemCount: number; paymentMethod: string }
     >();
 
     const billIds = new Set<string>();
 
     for (const row of rows) {
       const billId = row.get("บิล") || "";
-      const staffName = row.get("พนักงาน") || "";
       const skuCode = row.get("รหัสสินค้า") || "";
       const productName = row.get("ชื่อสินค้า") || "";
       const qty = Number(row.get("จำนวน")) || 0;
       const pricePerUnit = Number(row.get("ราคาต่อชิ้น")) || 0;
       const lineTotal = Number(row.get("ราคารวม")) || 0;
       const billTotal = Number(row.get("ยอดรวมทั้งบิล")) || 0;
+      const paymentMethod = row.get("การชำระเงิน") || "เงินสด";
       const time = row.get("เวลา") || "";
 
       billIds.add(billId);
@@ -113,25 +109,13 @@ export async function GET(req: Request) {
         });
       }
 
-      // Staff aggregation
-      if (staffName) {
-        if (!staffMap.has(staffName)) {
-          staffMap.set(staffName, { bills: new Set(), revenue: 0 });
-        }
-        const s = staffMap.get(staffName)!;
-        if (!s.bills.has(billId)) {
-          s.revenue += billTotal;
-        }
-        s.bills.add(billId);
-      }
-
       // Bill aggregation
       if (!billMap.has(billId)) {
         billMap.set(billId, {
           time,
-          staff: staffName,
           total: billTotal,
           itemCount: qty,
+          paymentMethod,
         });
       } else {
         billMap.get(billId)!.itemCount += qty;
@@ -143,35 +127,30 @@ export async function GET(req: Request) {
       (a, b) => b.revenue - a.revenue,
     );
 
-    const staffSummary: StaffSummary[] = Array.from(staffMap.entries()).map(
-      ([name, data]) => ({
-        name,
-        bills: data.bills.size,
-        revenue: data.revenue,
-      }),
-    );
-
     const bills: BillDetail[] = Array.from(billMap.entries())
       .map(([billId, data]) => ({
         billId,
         time: data.time,
-        staff: data.staff,
         total: data.total,
         itemCount: data.itemCount,
+        paymentMethod: data.paymentMethod,
       }))
       .sort((a, b) => b.time.localeCompare(a.time)); // newest first
 
     const totalRevenue = bills.reduce((sum, b) => sum + b.total, 0);
     const totalItems = items.reduce((sum, i) => sum + i.qty, 0);
+    const totalCash = bills.filter(b => b.paymentMethod === "เงินสด").reduce((sum, b) => sum + b.total, 0);
+    const totalTransfer = bills.filter(b => b.paymentMethod === "โอน").reduce((sum, b) => sum + b.total, 0);
 
     return NextResponse.json({
       success: true,
       date: sheetTitle,
       totalBills: billIds.size,
       totalRevenue,
+      totalCash,
+      totalTransfer,
       totalItems,
       items,
-      staffSummary,
       bills,
     });
   } catch (error: any) {

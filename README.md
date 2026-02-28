@@ -1,37 +1,218 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🛒 QuickPOS — ระบบขายหน้าร้าน
 
-## Getting Started
+ระบบ POS (Point of Sale) สำหรับขายสินค้าหน้าร้าน พร้อมระบบจัดการสต็อก, นับเงินสด, และสรุปยอดขาย
 
-First, run the development server:
+---
+
+## 📋 สารบัญ
+- [ฟีเจอร์](#-ฟีเจอร์)
+- [การตั้งค่า Google Sheet](#-การตั้งค่า-google-sheet)
+- [การตั้งค่าโปรเจค](#-การตั้งค่าโปรเจค)
+- [วิธีรันโปรเจค](#-วิธีรันโปรเจค)
+- [วิธีใช้งาน](#-วิธีใช้งาน)
+
+---
+
+## ✨ ฟีเจอร์
+
+| ฟีเจอร์ | คำอธิบาย |
+|---------|---------|
+| 🛒 **หน้าขายสินค้า** | เลือกสินค้าจาก grid, เพิ่มเข้าตะกร้า, ชำระเงิน (เงินสด/โอน) |
+| 📦 **เบิกสินค้า** | 2 ขั้นตอน: เบิกจากคลัง → แกะแบ่งไปขายหน้าร้าน |
+| 📉 **นับสต็อก** | นับสินค้าจริงเทียบกับยอดที่ควรเหลือ |
+| 💰 **นับเงินสด** | กรอกเงินทอนตั้งต้น + นับเงินจริงในลิ้นชัก |
+| 📊 **สรุปยอดขาย** | ดูยอดขายรายวัน, แยกเงินสด/โอน, ดูบิลทั้งหมด |
+| 📥 **Export Excel** | ดาวน์โหลดสรุปยอดขายเป็นไฟล์ .xlsx |
+
+---
+
+## 📊 การตั้งค่า Google Sheet
+
+### 1. สร้าง Google Sheet
+
+สร้าง Google Sheet ใหม่ โดยต้องมี sheet (แผ่นงาน) ชื่อ **"สินค้า"** ที่มี column ดังนี้:
+
+| Column | ชื่อ Header | ตัวอย่าง | คำอธิบาย |
+|--------|-----------|---------|---------|
+| A | **หมวดหมู่** | เบียร์ | กลุ่มสินค้า ใช้แบ่งหมวดในหน้าสต็อก/เบิก |
+| B | **รหัส SKU** | 8850999009674 | รหัสสินค้า (บาร์โค้ด) |
+| C | **ชื่อสินค้า** | เบียร์ลีโอ ขวดใหญ่ 630ml | ชื่อที่จะแสดงในระบบ |
+| D | **ราคาขาย (บาท)** | 55 | ราคาขายต่อชิ้น |
+| E | **ราคาทุน (บาท)** | 50 | ราคาต้นทุน |
+| F | **Path รูปภาพ** | image/leo630.jpg | path รูปภาพ (วางไว้ใน `public/image/`) |
+| G | **ตัดวัสดุ** | แก้วใหญ่ | ถ้าสินค้านี้ใช้วัสดุอื่น ให้ใส่ชื่อวัสดุ |
+| H | **จำนวนชิ้นต่อแพ็ค** | 12 | จำนวนชิ้นใน 1 แพ็ค (ถ้ามี) |
+| I | **จำนวนแพ็คต่อลัง** | 4 | จำนวนแพ็คใน 1 ลัง (ถ้ามี) |
+| J | **is_inventory** | TRUE / FALSE | **TRUE** = แสดงในหน้าสต็อก/เบิก, **FALSE** = ไม่แสดง |
+
+### ตัวอย่างค่า `is_inventory`
+
+| สินค้า | is_inventory | เหตุผล |
+|--------|-------------|-------|
+| เบียร์ลีโอ ขวดใหญ่ | TRUE | เป็นสินค้าที่ต้องนับสต็อก |
+| น้ำแข็งแก้วใหญ่ | FALSE | เป็นเมนูขาย ไม่ได้นับสต็อกโดยตรง (ใช้แก้ว+น้ำแข็ง) |
+| แก้วใหญ่ | TRUE | เป็นวัสดุที่ต้องนับสต็อก |
+
+### 2. Sheet อื่นๆ (สร้างอัตโนมัติ)
+
+ระบบจะสร้าง sheet เหล่านี้ให้อัตโนมัติเมื่อใช้งาน:
+
+| ชื่อ Sheet | คำอธิบาย |
+|-----------|---------|
+| **สต็อกรายวัน** | บันทึกยอดเบิก/นับสต็อกประจำวัน |
+| **นับเงินรายวัน** | บันทึกยอดนับเงินสดประจำวัน |
+| **DD-MM-YYYY** | บันทึกยอดขายรายวัน (สร้างใหม่ทุกวัน) เช่น `28-02-2026` |
+
+### 3. สร้าง Google Service Account
+
+1. ไปที่ [Google Cloud Console](https://console.cloud.google.com/)
+2. สร้าง Project ใหม่ (หรือใช้ที่มีอยู่)
+3. เปิดใช้ **Google Sheets API**
+4. ไปที่ **Credentials** → **Create Credentials** → **Service Account**
+5. สร้าง Key → เลือก **JSON** → ดาวน์โหลดไฟล์ JSON
+6. จาก JSON ที่ได้ จะใช้ค่า:
+   - `client_email` → ใส่ใน `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+   - `private_key` → ใส่ใน `GOOGLE_PRIVATE_KEY`
+7. **แชร์ Google Sheet** ให้กับ email ของ Service Account (ให้สิทธิ์ **Editor**)
+
+---
+
+## ⚙️ การตั้งค่าโปรเจค
+
+### 1. ติดตั้ง Dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. สร้างไฟล์ `.env.local`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+สร้างไฟล์ `.env.local` ที่ root ของโปรเจค:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nxxxxxx\n-----END PRIVATE KEY-----\n"
+GOOGLE_SHEET_ID=your-google-sheet-id-here
+```
 
-## Learn More
+**หมายเหตุ:**
+- `GOOGLE_SHEET_ID` คือ ID ที่อยู่ใน URL ของ Google Sheet เช่น `https://docs.google.com/spreadsheets/d/SHEET_ID_HERE/edit`
+- `GOOGLE_PRIVATE_KEY` ต้องมีเครื่องหมาย `"` ครอบ และใช้ `\n` แทนขึ้นบรรทัดใหม่
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🚀 วิธีรันโปรเจค
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Development Mode
+```bash
+npm run dev
+```
+เปิดเบราว์เซอร์ที่ `http://localhost:3000`
 
-## Deploy on Vercel
+### Production Build
+```bash
+npm run build
+npm start
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-"# pos" 
+## 📱 วิธีใช้งาน
+
+### 🛒 หน้าขายสินค้า (หน้าหลัก `/`)
+
+1. เปิดเว็บ → จะเห็น **grid สินค้า** ดึงจาก Google Sheet
+2. **แตะ/คลิกสินค้า** เพื่อเพิ่มเข้าตะกร้า
+3. ดูตะกร้าได้ที่:
+   - **Desktop:** แถบด้านขวา
+   - **Mobile:** แตะแถบ "รายการสินค้า" ด้านล่าง
+4. กด **"สรุปยอดชำระเงิน"** → เลือกวิธีจ่าย (เงินสด/โอน)
+5. ถ้าเลือก **เงินสด**: กดตัวเลขใส่จำนวนเงินที่รับมา → ระบบคำนวณเงินทอนให้
+6. กด **"ยืนยันชำระเงิน"** → บันทึกลง Google Sheet อัตโนมัติ
+
+### 📦 หน้าเบิกสินค้า (`/withdraw`)
+
+มี **2 ขั้นตอน** สลับโดย tab ด้านบน:
+
+**ขั้นที่ 1 — 🏭 เบิกจากคลัง**
+- กรอกจำนวนที่เบิกสินค้ามาจากคลัง/โกดัง (ลัง, แพ็ค, ชิ้น)
+- กรอกยอดยกมา (จากวันก่อน) ถ้าระบบไม่ได้ดึงมาให้
+
+**ขั้นที่ 2 — 🏪 เบิกไปขายหน้าร้าน**
+- จากสินค้าที่เบิกมาในขั้นที่ 1 → แกะแบ่งไปขาย
+- เช่น แกะ **ลัง → แพ็ค** หรือ **แพ็ค → ชิ้น**
+- ระบบแสดงจำนวนที่ได้จากการแกะ (เช่น 2 ลัง = +40 แพ็ค)
+
+กด **"ยืนยันข้อมูล"** เพื่อบันทึก
+
+### 📉 หน้านับสต็อก (`/stock`)
+
+1. ระบบแสดงสินค้าที่มี `is_inventory = TRUE` จัดกลุ่มตามหมวดหมู่
+2. สำหรับแต่ละสินค้า จะเห็น:
+   - **มีทั้งหมด**: ยอดยกมา + ที่เบิกมาขาย
+   - **ขายไป**: จำนวนที่ขายวันนี้ (ดึงจากยอดขาย)
+   - **ใช้แถม**: จำนวนที่ใช้เป็นวัสดุ (แก้ว/ถุง)
+   - **ควรเหลือ**: จำนวนที่ควรเหลือจริง
+3. กรอก **"นับจริง"** → ระบบแสดง **ส่วนต่าง** (เกิน/ขาด)
+4. กด **"ยืนยันยอดสต็อก"** เพื่อบันทึก
+
+### 💰 หน้านับเงินสด (`/cash-count`)
+
+1. กรอก **เงินทอนตั้งต้น** (Float) — เงินที่เตรียมไว้ในลิ้นชักก่อนเปิดร้าน
+2. ระบบดึง **ยอดขายเงินสดวันนี้** มาให้อัตโนมัติ
+3. ระบบคำนวณ **ยอดควรมี** = เงินทอนตั้งต้น + ยอดขายเงินสด
+4. กรอก **นับเงินจริง** — จำนวนเงินที่นับได้จริงในลิ้นชัก
+5. ระบบแสดง **ส่วนต่าง** (เกิน/ขาด)
+6. กด **"บันทึกยอดเงิน"** เพื่อบันทึก
+
+### 📊 สรุปยอดขาย
+
+1. กดปุ่ม **📊 สรุปยอด** ที่ header
+2. เลือกวันที่ด้วย ‹ › หรือกดเลือกจาก dropdown
+3. ดูได้ 2 tab:
+   - **🏆 ขายดี**: สินค้าเรียงตามยอดขาย
+   - **🧾 บิลวันนี้**: รายการบิลทั้งหมด
+4. กดปุ่ม **📥 Export Excel** (มุมบนขวา) เพื่อดาวน์โหลด
+   - ไฟล์ Excel จะมี 3 sheet: สรุปภาพรวม, รายการสินค้า, รายการบิล
+
+---
+
+## 🗂️ โครงสร้างโปรเจค
+
+```
+pos/
+├── app/
+│   ├── page.tsx          # หน้าขายสินค้า (POS)
+│   ├── stock/page.tsx    # หน้านับสต็อก
+│   ├── withdraw/page.tsx # หน้าเบิกสินค้า
+│   ├── cash-count/page.tsx # หน้านับเงินสด
+│   ├── globals.css       # CSS หลัก
+│   ├── layout.tsx        # Layout หลัก
+│   └── api/
+│       ├── products/     # API ดึงสินค้าจาก Google Sheet
+│       ├── checkout/     # API บันทึกยอดขาย
+│       ├── inventory/    # API จัดการสต็อก
+│       ├── cash-count/   # API จัดการนับเงิน
+│       ├── daily-summary/ # API สรุปยอดขาย
+│       └── available-dates/ # API วันที่มีข้อมูล
+├── components/
+│   ├── PosHeader.tsx     # Header + Navigation
+│   ├── ProductCard.tsx   # การ์ดสินค้า
+│   ├── CartSidebar.tsx   # ตะกร้าสินค้า
+│   ├── CheckoutModal.tsx # หน้าชำระเงิน
+│   ├── SummaryModal.tsx  # สรุปยอดขาย + Export Excel
+│   └── PosTypes.ts       # TypeScript Types
+├── public/image/         # รูปสินค้า
+├── .env.local            # ค่า Config (ไม่ Push ขึ้น Git)
+└── package.json
+```
+
+---
+
+## 🛠️ เทคโนโลยีที่ใช้
+
+- **Next.js 16** — React Framework
+- **TailwindCSS 4** — Styling
+- **Google Sheets API** — ฐานข้อมูลสินค้าและยอดขาย
+- **SheetJS (xlsx)** — Export Excel ฝั่ง Client
+- **TypeScript** — Type Safety
