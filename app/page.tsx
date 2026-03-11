@@ -151,7 +151,7 @@ export default function POSPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-white flex flex-col font-sans">
+    <div className="h-screen bg-[#0b0f19] text-white flex flex-col font-sans overflow-hidden" style={{ height: "100dvh" }}>
       <PosHeader onSummary={fetchDailySummary} />
 
       <main className="flex-1 flex overflow-hidden">

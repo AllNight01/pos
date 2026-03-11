@@ -22,26 +22,31 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
 }) => {
   return (
     <div
-      className="flex flex-col h-full bg-[#0b0f19] border-l border-white/[0.04]"
+      className="flex flex-col h-full bg-[#0b0f19] border-l border-white/[0.04] overflow-hidden"
       style={{
-        /* On mobile (inside bottom sheet) use dvh-based grid;
-           on desktop the parent constrains the height */
+        height: "calc(100dvh - 6rem)", // เพิ่มพื้นที่ว่างเพิ่มเติม
         display: "grid",
-        gridTemplateRows: "auto 1fr auto",
-        maxHeight: "100%",
-        overflow: "hidden",
+        gridTemplateRows: "auto 1fr auto", // กลับไปใช้ 1fr ธรรมดา
+        maxHeight: "calc(100dvh - 6rem)",
       }}
     >
       {/* ───── HEADER ───── */}
       <div className="px-4 sm:px-6 lg:px-8 py-3 sm:py-5 lg:py-6 border-b border-white/[0.04] flex items-center justify-between shrink-0">
-        <h2 className="text-lg sm:text-2xl lg:text-3xl font-black text-white flex items-center gap-2 sm:gap-3">
-          ตะกร้าสินค้า
-          {cart.length > 0 && (
-            <span className="bg-white/10 text-[10px] sm:text-xs px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-slate-400 font-bold tabular-nums">
-              {cart.length}
-            </span>
-          )}
-        </h2>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <img 
+            src="/logo_quickpos.png" 
+            alt="QuickPOS Logo" 
+            className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 object-contain"
+          />
+          <h2 className="text-lg sm:text-2xl lg:text-3xl font-black text-white flex items-center gap-2 sm:gap-3">
+            ตะกร้าสินค้า
+            {cart.length > 0 && (
+              <span className="bg-white/10 text-[10px] sm:text-xs px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-slate-400 font-bold tabular-nums">
+                {cart.length}
+              </span>
+            )}
+          </h2>
+        </div>
         <button
           onClick={clearCart}
           className="text-[10px] sm:text-xs font-black text-slate-500 hover:text-red-400 uppercase tracking-widest transition-colors"
@@ -53,7 +58,11 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       {/* ───── SCROLLABLE ITEMS ───── */}
       <div
         className="overflow-y-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-6 space-y-3 sm:space-y-5"
-        style={{ scrollbarWidth: "none", minHeight: 0 }}
+        style={{ 
+          scrollbarWidth: "none", 
+          maxHeight: "calc(100dvh - 250px)", // จำกัดความสูงสูงสุดเพื่อให้ footer โชว์
+          WebkitOverflowScrolling: "touch"
+        }}
       >
         {cart.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-600 gap-3 sm:gap-4 opacity-40 min-h-[200px]">
@@ -114,14 +123,14 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
       </div>
 
       {/* ───── STICKY FOOTER — Total + Checkout button ───── */}
-      <div className="px-4 sm:px-6 lg:px-8 py-3 sm:py-5 lg:py-6 bg-[#0d1117] border-t border-white/[0.04] space-y-2.5 sm:space-y-4 shrink-0 safe-area-bottom">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 lg:py-6 bg-[#0d1117] border-t border-white/[0.04] space-y-3 sm:space-y-4 lg:space-y-5 shrink-0 safe-area-bottom" style={{ height: "140px" }}>
         <div className="flex items-center justify-between">
           <span className="text-slate-500 font-black text-[10px] sm:text-sm uppercase tracking-widest">
             ยอดรวมทั้งหมด
           </span>
-          <span className="text-xl sm:text-3xl lg:text-4xl font-black text-white tabular-nums tracking-tighter">
+          <span className="text-lg sm:text-xl lg:text-2xl font-black text-white tabular-nums tracking-tighter">
             {totalPrice.toLocaleString()}
-            <span className="text-xs sm:text-base lg:text-lg ml-1 text-cyan-400">
+            <span className="text-xs sm:text-sm lg:text-base ml-1 text-cyan-400">
               ฿
             </span>
           </span>
@@ -129,9 +138,9 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         <button
           onClick={openCheckout}
           disabled={cart.length === 0}
-          className="w-full py-3 sm:py-5 lg:py-6 rounded-2xl sm:rounded-[32px] bg-linear-to-r from-cyan-500 to-blue-500 font-black text-base sm:text-xl lg:text-2xl text-white shadow-2xl shadow-cyan-500/20 active:scale-[0.98] transition-all disabled:opacity-20"
+          className="w-full py-3 sm:py-4 lg:py-5 rounded-xl sm:rounded-2xl lg:rounded-[32px] bg-linear-to-r from-cyan-500 to-blue-500 font-black text-sm sm:text-base lg:text-lg text-white shadow-2xl shadow-cyan-500/20 active:scale-[0.98] transition-all disabled:opacity-20"
         >
-          สรุปยอดชำระเงิน
+          สรุดยอดชำระเงิน
         </button>
       </div>
     </div>
