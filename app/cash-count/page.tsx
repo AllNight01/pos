@@ -13,7 +13,7 @@ const DENOMINATIONS = [
   { value: 5, label: "5", type: "coin", accent: "text-cyan-300" },
   { value: 2, label: "2", type: "coin", accent: "text-slate-300" },
   { value: 1, label: "1", type: "coin", accent: "text-slate-300" },
-];
+] as const;
 
 function getTodayDateStr() {
   const now = new Date();
@@ -423,7 +423,7 @@ function DenomRow({
         <div className={`w-16 text-center text-lg font-black ${denom.accent}`}>
           {denom.label}
         </div>
-        <span className="text-slate-600">×</span>
+        <span className="text-slate-600">x</span>
         <input
           type="text"
           inputMode="numeric"

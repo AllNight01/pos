@@ -171,6 +171,7 @@ export default function POSPage() {
     <AppShell
       title="ขายสินค้า"
       subtitle="เลือกสินค้า ชำระเงิน และตรวจสรุปรายวันได้จากหน้าเดียว"
+      lockDesktopViewport
       actions={
         <div className="hidden items-center gap-3 xl:flex">
           <button
@@ -190,7 +191,7 @@ export default function POSPage() {
         </div>
       }
     >
-      <div className="flex min-h-[calc(100dvh-11rem)] flex-col gap-4 xl:h-[calc(100dvh-11rem)] xl:flex-row xl:overflow-hidden">
+      <div className="flex min-h-[calc(100dvh-11rem)] flex-col gap-4 xl:flex-row 2xl:h-[calc(100dvh-11rem)] 2xl:overflow-hidden">
         <section className="grid min-h-0 flex-1 grid-rows-[auto_1fr] rounded-[32px] border border-white/[0.06] bg-[#0c1220] shadow-2xl shadow-black/30">
           <div className="border-b border-white/[0.05] px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">

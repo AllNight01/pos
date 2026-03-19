@@ -9,6 +9,7 @@ interface AppShellProps {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  lockDesktopViewport?: boolean;
 }
 
 interface NavItem {
@@ -195,7 +196,13 @@ function SidebarContent({
   );
 }
 
-export function AppShell({ children, title, subtitle, actions }: AppShellProps) {
+export function AppShell({
+  children,
+  title,
+  subtitle,
+  actions,
+  lockDesktopViewport = false,
+}: AppShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -217,7 +224,11 @@ export function AppShell({ children, title, subtitle, actions }: AppShellProps) 
   }, [mobileOpen]);
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-white md:max-h-screen md:overflow-hidden">
+    <div
+      className={`min-h-screen bg-[#0b0f19] text-white ${
+        lockDesktopViewport ? "xl:max-h-screen xl:overflow-hidden" : ""
+      }`}
+    >
       <div className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-[300px] md:border-r md:border-white/[0.06] md:bg-[#0a0f18]/95 md:backdrop-blur-2xl">
         <div className="h-full w-full p-4">
           <SidebarContent pathname={pathname} />
@@ -236,9 +247,9 @@ export function AppShell({ children, title, subtitle, actions }: AppShellProps) 
                 type="button"
                 onClick={() => setMobileOpen(true)}
                 aria-label="Open navigation"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-xl"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] px-2 text-xs font-black uppercase tracking-[0.2em]"
               >
-                ≡
+                Menu
               </button>
             </div>
             {actions && <div className="mt-3 flex flex-wrap items-center gap-2">{actions}</div>}
@@ -268,9 +279,9 @@ export function AppShell({ children, title, subtitle, actions }: AppShellProps) 
                   type="button"
                   onClick={() => setMobileOpen(false)}
                   aria-label="Close navigation"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-xl text-white"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-base font-black text-white"
                 >
-                  ×
+                  X
                 </button>
               </div>
               <div
