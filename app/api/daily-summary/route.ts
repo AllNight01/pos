@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
+import { getAllSessions, getSessionDateRange } from "../_lib/stockSession";
 
 interface SummaryItem {
   sku_code: string;
@@ -37,7 +38,21 @@ const INVENTORY_HEADERS = [
   "ยอดยกมา",
   "เบิก",
   "นับจริง",
+  "ยอดยกมาคลัง",
+  "รับเข้าคลัง",
 ];
+
+const SALES_COLUMNS = {
+  billId: "บิล",
+  skuCode: "รหัสสินค้า",
+  productName: "ชื่อสินค้า",
+  qty: "จำนวน",
+  pricePerUnit: "ราคาต่อชิ้น",
+  lineTotal: "ราคารวม",
+  billTotal: "ยอดรวมทั้งบิล",
+  paymentMethod: "การชำระเงิน",
+  time: "เวลา",
+} as const;
 
 function getTodayDateStr() {
   const now = new Date();
@@ -80,12 +95,20 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const dateParam = url.searchParams.get("date");
-    const sheetTitle =
+    const sessionId = url.searchParams.get("session_id");
+    const fallbackDate =
       dateParam && /^\d{2}-\d{2}-\d{4}$/.test(dateParam)
         ? dateParam
         : getTodayDateStr();
 
-    const salesSheet = doc.sheetsByTitle[sheetTitle];
+    const sessions = await getAllSessions(doc);
+    const selectedSession = sessionId
+      ? sessions.find((session) => session.session_id === sessionId) || null
+      : null;
+    const salesDates = selectedSession
+      ? getSessionDateRange(selectedSession)
+      : [fallbackDate];
+
     const inventorySheet = await getInventorySheet(doc);
 
     const itemMap = new Map<string, SummaryItem>();
@@ -95,23 +118,30 @@ export async function GET(req: Request) {
     >();
     const billIds = new Set<string>();
 
-    if (salesSheet) {
+    for (const salesDate of salesDates) {
+      const salesSheet = doc.sheetsByTitle[salesDate];
+      if (!salesSheet) continue;
+
       const rows = await salesSheet.getRows();
 
       for (const row of rows) {
-        const billId = row.get("บิล") || "";
-        const skuCode = row.get("รหัสสินค้า") || "";
-        const productName = row.get("ชื่อสินค้า") || "";
-        const qty = Number(row.get("จำนวน")) || 0;
-        const pricePerUnit = Number(row.get("ราคาต่อชิ้น")) || 0;
-        const lineTotal = Number(row.get("ราคารวม")) || 0;
-        const billTotal = Number(row.get("ยอดรวมทั้งบิล")) || 0;
-        const paymentMethod = row.get("การชำระเงิน") || "เงินสด";
-        const time = row.get("เวลา") || "";
+        const billId = String(row.get(SALES_COLUMNS.billId) || "");
+        const skuCode = String(row.get(SALES_COLUMNS.skuCode) || "");
+        const productName = String(row.get(SALES_COLUMNS.productName) || "");
+        const qty = Number(row.get(SALES_COLUMNS.qty)) || 0;
+        const pricePerUnit = Number(row.get(SALES_COLUMNS.pricePerUnit)) || 0;
+        const lineTotal = Number(row.get(SALES_COLUMNS.lineTotal)) || 0;
+        const billTotal = Number(row.get(SALES_COLUMNS.billTotal)) || 0;
+        const paymentMethod =
+          String(row.get(SALES_COLUMNS.paymentMethod) || "เงินสด");
+        const time = String(row.get(SALES_COLUMNS.time) || "");
 
+        if (!billId) continue;
         billIds.add(billId);
 
         const key = skuCode || productName;
+        if (!key) continue;
+
         if (itemMap.has(key)) {
           const existing = itemMap.get(key)!;
           existing.qty += qty;
@@ -166,10 +196,11 @@ export async function GET(req: Request) {
     const inventoryMap = new Map<string, InventorySummaryRow>();
 
     for (const row of inventoryRows) {
-      if ((row.get("วันที่") || "") !== sheetTitle) continue;
+      const rowDate = String(row.get("วันที่") || "");
+      if (!salesDates.includes(rowDate)) continue;
 
-      const skuCode = row.get("รหัสสินค้า") || "";
-      const name = row.get("ชื่อสินค้า") || "";
+      const skuCode = String(row.get("รหัสสินค้า") || "");
+      const name = String(row.get("ชื่อสินค้า") || "");
       const key = skuCode || name;
       if (!key) continue;
 
@@ -192,7 +223,9 @@ export async function GET(req: Request) {
       inventoryMap.set(key, existing);
     }
 
-    const soldMap = new Map(items.map((item) => [item.sku_code || item.name, item.qty]));
+    const soldMap = new Map(
+      items.map((item) => [item.sku_code || item.name, item.qty]),
+    );
 
     const stockItems = Array.from(inventoryMap.values())
       .map((item) => {
@@ -258,7 +291,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
-      date: sheetTitle,
+      date: fallbackDate,
+      selectedDate: fallbackDate,
+      session: selectedSession,
       totalBills: billIds.size,
       totalRevenue,
       totalCash,
@@ -269,10 +304,12 @@ export async function GET(req: Request) {
       stockItems,
       stockTotals,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Daily summary error";
     console.error("Daily summary error:", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: message },
       { status: 500 },
     );
   }

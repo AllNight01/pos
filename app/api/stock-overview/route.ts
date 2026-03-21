@@ -16,11 +16,53 @@ import {
 
 interface Accumulator {
   warehouseBeforeSession: number;
+  warehouseOpeningInSession: number;
   receivedToWarehouse: number;
   movedToStorefront: number;
   returnedToWarehouse: number;
   storefrontCountLatest: number;
   storefrontCountTimestamp: string;
+}
+
+const STOCK_OVERVIEW_CACHE_TTL_MS = 30 * 1000;
+
+const stockOverviewCache = new Map<
+  string,
+  {
+    payload: ReturnType<typeof buildEmptyResponse>;
+    expiresAt: number;
+  }
+>();
+
+function buildEmptyResponse() {
+  return {
+    success: true,
+    session: null,
+    generatedAt: new Date().toISOString(),
+    items: [],
+    sessionSummary: [],
+    totals: {
+      warehouseOpening: 0,
+      receivedToWarehouse: 0,
+      movedToStorefront: 0,
+      returnedToWarehouse: 0,
+      warehouseBalance: 0,
+      storefrontBalance: 0,
+      soldToday: 0,
+      soldInSession: 0,
+      storefrontExpected: 0,
+      storefrontActual: 0,
+      storefrontDiff: 0,
+    },
+    sessionSummaryTotals: {
+      totalWithdrawn: 0,
+      totalSold: 0,
+      totalExpected: 0,
+      totalCounted: 0,
+      totalDiff: 0,
+    },
+    movements: [],
+  };
 }
 
 function getKey(skuCode: string, name: string) {
@@ -30,6 +72,7 @@ function getKey(skuCode: string, name: string) {
 function emptyAccumulator(): Accumulator {
   return {
     warehouseBeforeSession: 0,
+    warehouseOpeningInSession: 0,
     receivedToWarehouse: 0,
     movedToStorefront: 0,
     returnedToWarehouse: 0,
@@ -44,6 +87,10 @@ function applyWarehouseBalance(
   toSessionOpening: boolean,
 ) {
   const qty = movement.qty_piece;
+  if (movement.movement_type === "warehouse_opening") {
+    if (toSessionOpening) acc.warehouseBeforeSession += qty;
+    else acc.warehouseOpeningInSession += qty;
+  }
   if (movement.movement_type === "receive_to_warehouse") {
     if (toSessionOpening) acc.warehouseBeforeSession += qty;
     else acc.receivedToWarehouse += qty;
@@ -59,52 +106,50 @@ function applyWarehouseBalance(
 }
 
 export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const sessionId = url.searchParams.get("session_id");
+  const cacheKey = sessionId || "__current__";
+  const cached = stockOverviewCache.get(cacheKey);
+  if (cached && Date.now() <= cached.expiresAt) {
+    return NextResponse.json({ ...cached.payload, cached: true });
+  }
+
   try {
-    const url = new URL(req.url);
-    const sessionId = url.searchParams.get("session_id");
+    const includeAll = sessionId === "all";
     const doc = await getSpreadsheet();
 
     const sessions = await getAllSessions(doc);
-    const activeSession =
-      sessions.find((session) => session.session_id === sessionId) ||
-      (await getOpenSession(doc));
+    const activeSession = includeAll
+      ? null
+      : sessions.find((session) => session.session_id === sessionId) ||
+        (await getOpenSession(doc));
 
-    if (!activeSession) {
-      return NextResponse.json({
-        success: true,
-        session: null,
-        generatedAt: new Date().toISOString(),
-        items: [],
-        sessionSummary: [],
-        totals: {
-          warehouseOpening: 0,
-          receivedToWarehouse: 0,
-          movedToStorefront: 0,
-          returnedToWarehouse: 0,
-          warehouseBalance: 0,
-          storefrontBalance: 0,
-          soldToday: 0,
-          soldInSession: 0,
-          storefrontExpected: 0,
-          storefrontActual: 0,
-          storefrontDiff: 0,
-        },
-        sessionSummaryTotals: {
-          totalWithdrawn: 0,
-          totalSold: 0,
-          totalExpected: 0,
-          totalCounted: 0,
-          totalDiff: 0,
-        },
-        movements: [],
+    if (!includeAll && !activeSession) {
+      const empty = buildEmptyResponse();
+      stockOverviewCache.set(cacheKey, {
+        payload: empty,
+        expiresAt: Date.now() + STOCK_OVERVIEW_CACHE_TTL_MS,
       });
+      return NextResponse.json({ ...empty, cached: false });
     }
 
     const allMovements = await getAllMovements(doc);
-    const sessionMovements = allMovements.filter(
-      (movement) => movement.session_id === activeSession.session_id,
+    const selectedSessions = includeAll
+      ? sessions
+      : activeSession
+        ? [activeSession]
+        : [];
+    const selectedSessionIds = new Set(
+      selectedSessions.map((session) => session.session_id),
     );
-    const sessionStart = `${activeSession.started_at}T00:00:00.000Z`;
+    const sessionMovements = includeAll
+      ? allMovements
+      : allMovements.filter(
+          (movement) => movement.session_id === activeSession?.session_id,
+        );
+    const sessionStart = activeSession
+      ? `${activeSession.started_at}T00:00:00.000Z`
+      : "";
 
     const perSku = new Map<string, Accumulator>();
     const ensureSku = (key: string) => {
@@ -117,8 +162,9 @@ export async function GET(req: Request) {
       if (!key) continue;
       const acc = ensureSku(key);
       const isBeforeSession =
+        !includeAll &&
         movement.timestamp < sessionStart &&
-        movement.session_id !== activeSession.session_id;
+        movement.session_id !== activeSession?.session_id;
       if (isBeforeSession) {
         applyWarehouseBalance(acc, movement, true);
       }
@@ -139,7 +185,15 @@ export async function GET(req: Request) {
       }
     }
 
-    const sessionDates = getSessionDateRange(activeSession);
+    const sessionDates = includeAll
+      ? Array.from(
+          new Set(
+            selectedSessions.flatMap((session) => getSessionDateRange(session)),
+          ),
+        )
+      : activeSession
+        ? getSessionDateRange(activeSession)
+        : [];
     const { soldBySku, soldTodayBySku } = await getSalesTotalsForDates(
       doc,
       sessionDates,
@@ -166,8 +220,10 @@ export async function GET(req: Request) {
         const acc = perSku.get(product.key) || emptyAccumulator();
         const soldInSession = soldBySku.get(product.key)?.qty || 0;
         const soldToday = soldTodayBySku.get(product.key) || 0;
+        const warehouseOpening =
+          acc.warehouseBeforeSession + acc.warehouseOpeningInSession;
         const warehouseBalance =
-          acc.warehouseBeforeSession +
+          warehouseOpening +
           acc.receivedToWarehouse -
           acc.movedToStorefront +
           acc.returnedToWarehouse;
@@ -183,7 +239,7 @@ export async function GET(req: Request) {
         return {
           sku_code: product.sku_code || product.key,
           name: product.name,
-          warehouseOpening: acc.warehouseBeforeSession,
+          warehouseOpening,
           receivedToWarehouse: acc.receivedToWarehouse,
           movedToStorefront: acc.movedToStorefront,
           returnedToWarehouse: acc.returnedToWarehouse,
@@ -281,7 +337,7 @@ export async function GET(req: Request) {
       },
     );
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       session: activeSession,
       generatedAt: new Date().toISOString(),
@@ -289,12 +345,34 @@ export async function GET(req: Request) {
       sessionSummary,
       totals,
       sessionSummaryTotals,
-      movements: sessionMovements,
+      movements: includeAll
+        ? sessionMovements.filter((movement) =>
+            selectedSessionIds.has(movement.session_id),
+          )
+        : sessionMovements,
       today: getTodayDateStr(),
+    };
+
+    stockOverviewCache.set(cacheKey, {
+      payload,
+      expiresAt: Date.now() + STOCK_OVERVIEW_CACHE_TTL_MS,
     });
-  } catch (error: any) {
+
+    return NextResponse.json({ ...payload, cached: false });
+  } catch (error: unknown) {
+    const stale = stockOverviewCache.get(cacheKey);
+    if (stale) {
+      return NextResponse.json({
+        ...stale.payload,
+        cached: true,
+        stale: true,
+      });
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Unknown stock overview error";
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: message },
       { status: 500 },
     );
   }

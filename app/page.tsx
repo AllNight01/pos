@@ -27,11 +27,15 @@ export default function POSPage() {
   const [changeAmount, setChangeAmount] = useState<number | null>(null);
   const [checkoutDone, setCheckoutDone] = useState(false);
   const [showMobileCart, setShowMobileCart] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "transfer">(
+    "cash",
+  );
   const [showSummary, setShowSummary] = useState(false);
   const [summaryData, setSummaryData] = useState<DailySummaryData | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryTab, setSummaryTab] = useState<"items" | "bills" | "stock">("items");
+  const [summaryTab, setSummaryTab] = useState<"items" | "bills" | "stock">(
+    "items",
+  );
   const [summaryDate, setSummaryDate] = useState<string>("");
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -93,12 +97,19 @@ export default function POSPage() {
     const cleaned = value.replace(/[^0-9]/g, "");
     setReceivedAmount(cleaned);
     const numeric = Number(cleaned);
-    setChangeAmount(cleaned && numeric >= totalPrice ? numeric - totalPrice : null);
+    setChangeAmount(
+      cleaned && numeric >= totalPrice ? numeric - totalPrice : null,
+    );
   };
 
   const handleConfirmCheckout = async () => {
     const received = Number(receivedAmount);
-    if (paymentMethod === "cash" && (!receivedAmount || received < totalPrice)) return;
+    if (
+      paymentMethod === "cash" &&
+      (!receivedAmount || received < totalPrice)
+    ) {
+      return;
+    }
 
     setLoading(true);
     try {
@@ -115,12 +126,13 @@ export default function POSPage() {
         }),
       });
 
-      if (res.ok) setCheckoutDone(true);
-      else {
+      if (res.ok) {
+        setCheckoutDone(true);
+      } else {
         const data = await res.json().catch(() => null);
         alert(data?.error || "เกิดข้อผิดพลาดในการบันทึกการขาย");
       }
-    } catch (error) {
+    } catch {
       alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
     } finally {
       setLoading(false);
@@ -173,66 +185,75 @@ export default function POSPage() {
       subtitle="เลือกสินค้า ชำระเงิน และตรวจสรุปรายวันได้จากหน้าเดียว"
       lockDesktopViewport
       actions={
-        <div className="hidden items-center gap-3 xl:flex">
+        <div className="hidden items-center gap-3 2xl:flex">
           <button
             type="button"
             onClick={() => openSummary("items")}
-            className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-base font-black text-cyan-300 transition hover:bg-cyan-500/15"
+            className="whitespace-nowrap rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-base font-black text-cyan-300 transition hover:bg-cyan-500/15"
           >
             สรุปยอดวันนี้
           </button>
           <button
             type="button"
             onClick={() => openSummary("stock")}
-            className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-base font-black text-rose-200 transition hover:bg-rose-500/15"
+            className="whitespace-nowrap rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-base font-black text-rose-200 transition hover:bg-rose-500/15"
           >
             สรุปสต๊อกวันนี้
           </button>
         </div>
       }
     >
-      <div className="flex min-h-[calc(100dvh-11rem)] flex-col gap-4 xl:flex-row 2xl:h-[calc(100dvh-11rem)] 2xl:overflow-hidden">
-        <section className="grid min-h-0 flex-1 grid-rows-[auto_1fr] rounded-[32px] border border-white/[0.06] bg-[#0c1220] shadow-2xl shadow-black/30">
+      <div className="flex min-h-[calc(100dvh-11rem)] flex-col gap-4 2xl:h-[calc(100dvh-11rem)] 2xl:max-h-[calc(100dvh-11rem)] 2xl:flex-row 2xl:overflow-hidden">
+        <section className="grid min-h-0 flex-1 grid-rows-[auto_1fr] rounded-[32px] border border-white/[0.06] bg-[#0c1220] shadow-2xl shadow-black/30 2xl:h-full 2xl:max-h-full 2xl:overflow-hidden">
           <div className="border-b border-white/[0.05] px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.28em] text-slate-400">
                   POS Workspace
                 </p>
-                <h2 className="mt-2 text-2xl font-black text-white">เลือกสินค้า</h2>
+                <h2 className="mt-2 text-2xl font-black text-white">
+                  เลือกสินค้า
+                </h2>
               </div>
-              <div className="flex items-center gap-2 xl:hidden">
+              <div className="flex items-center gap-2 2xl:hidden">
                 <button
                   type="button"
                   onClick={() => openSummary("items")}
-                  className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2.5 text-sm font-black text-cyan-300"
+                  className="whitespace-nowrap rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2.5 text-sm font-black text-cyan-300"
                 >
                   สรุปยอด
                 </button>
                 <button
                   type="button"
                   onClick={() => openSummary("stock")}
-                  className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm font-black text-rose-200"
+                  className="whitespace-nowrap rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm font-black text-rose-200"
                 >
                   สรุปสต๊อก
                 </button>
               </div>
             </div>
           </div>
-          <div className="min-h-0 overflow-y-auto p-4 sm:p-5 lg:p-6" style={{ scrollbarWidth: "none" }}>
+
+          <div
+            className="min-h-0 overflow-y-auto p-4 sm:p-5 lg:p-6 2xl:max-h-full"
+            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+          >
             {productsLoading ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                 {[...Array(12)].map((_, index) => (
                   <div
                     key={index}
-                    className="aspect-[3/4] rounded-[28px] bg-white/[0.03] animate-pulse"
+                    className="aspect-[3/4] animate-pulse rounded-[28px] bg-white/[0.03]"
                   />
                 ))}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                 {products
-                  .filter((product) => product.price > 0 && product.is_active !== false)
+                  .filter(
+                    (product) =>
+                      product.price > 0 && product.is_active !== false,
+                  )
                   .map((product) => (
                     <ProductCard
                       key={product.sku_code}
@@ -245,8 +266,8 @@ export default function POSPage() {
           </div>
         </section>
 
-        <aside className="hidden min-h-0 w-[360px] shrink-0 xl:block 2xl:w-[400px]">
-          <div className="h-full rounded-[32px] border border-white/[0.06] bg-[#0d1117] shadow-2xl shadow-black/30">
+        <aside className="hidden min-h-0 w-[360px] shrink-0 2xl:block 2xl:h-full 2xl:max-h-full 2xl:w-[400px]">
+          <div className="h-full overflow-hidden rounded-[32px] border border-white/[0.06] bg-[#0d1117] shadow-2xl shadow-black/30">
             <CartSidebar
               cart={cart}
               addToCart={addToCart}
@@ -260,20 +281,24 @@ export default function POSPage() {
       </div>
 
       {cart.length > 0 && (
-        <div className="fixed inset-x-3 bottom-4 z-40 xl:hidden">
+        <div className="fixed inset-x-3 bottom-4 z-40 2xl:hidden">
           <button
             type="button"
             onClick={() => setShowMobileCart(true)}
-            className="flex w-full items-center justify-between rounded-[28px] bg-linear-to-r from-cyan-400 to-blue-600 px-4 py-4 font-black text-white shadow-[0_20px_60px_-15px_rgba(6,182,212,0.5)] transition active:scale-[0.98]"
+            className="flex w-full items-center justify-between whitespace-nowrap rounded-[28px] bg-linear-to-r from-cyan-400 to-blue-600 px-4 py-4 font-black text-white shadow-[0_20px_60px_-15px_rgba(6,182,212,0.5)] transition active:scale-[0.98]"
           >
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-base tabular-nums">
                 {cart.length}
               </span>
-              <span className="text-base uppercase tracking-wide">ตะกร้าสินค้า</span>
+              <span className="text-base uppercase tracking-wide">
+                ตะกร้าสินค้า
+              </span>
             </div>
             <div className="text-right">
-              <p className="text-lg font-black">{totalPrice.toLocaleString()}</p>
+              <p className="text-lg font-black">
+                {totalPrice.toLocaleString()}
+              </p>
               <p className="text-sm text-white/80">กดเพื่อดูรายการ</p>
             </div>
           </button>
@@ -281,14 +306,16 @@ export default function POSPage() {
       )}
 
       {showMobileCart && (
-        <div className="fixed inset-0 z-50 xl:hidden">
+        <div className="fixed inset-0 z-50 2xl:hidden">
           <div
             className="absolute inset-0 bg-black/90 backdrop-blur-xl"
             onClick={() => setShowMobileCart(false)}
           />
           <div
             className="absolute inset-x-0 bottom-0 max-h-[88dvh] rounded-t-[36px] border-t border-white/10 bg-[#0b0f19] shadow-2xl"
-            style={{ animation: "slide-up .35s cubic-bezier(0.16, 1, 0.3, 1) both" }}
+            style={{
+              animation: "slide-up .35s cubic-bezier(0.16, 1, 0.3, 1) both",
+            }}
           >
             <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-white/10" />
             <div className="h-[82dvh] min-h-0">
@@ -308,7 +335,6 @@ export default function POSPage() {
       <CheckoutModal
         showCheckout={showCheckout}
         setShowCheckout={setShowCheckout}
-        cart={cart}
         totalPrice={totalPrice}
         paymentMethod={paymentMethod}
         setPaymentMethod={setPaymentMethod}

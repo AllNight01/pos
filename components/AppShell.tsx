@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 
+const APP_VERSION = "v0.1.0";
+
 interface AppShellProps {
   children: ReactNode;
   title: string;
@@ -32,7 +34,8 @@ const MAIN_NAV: NavItem[] = [
     label: "สต๊อก",
     icon: "T",
     accent: "from-emerald-400 to-teal-500",
-    match: (pathname) => pathname.startsWith("/stock") || pathname.startsWith("/withdraw"),
+    match: (pathname) =>
+      pathname.startsWith("/stock") || pathname.startsWith("/withdraw"),
   },
   {
     href: "/products",
@@ -61,6 +64,12 @@ const MAIN_NAV: NavItem[] = [
 ];
 
 const STOCK_NAV: NavItem[] = [
+  {
+    href: "/stock/all",
+    label: "สต๊อกรวม",
+    icon: "A",
+    accent: "from-cyan-300 to-blue-500",
+  },
   {
     href: "/stock/warehouse",
     label: "คลังร้าน",
@@ -123,7 +132,9 @@ function NavLink({
       </span>
       {!compact && (
         <div className="min-w-0">
-          <p className="truncate text-base font-black tracking-tight">{item.label}</p>
+          <p className="truncate text-base font-black tracking-tight">
+            {item.label}
+          </p>
           <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
             {active ? "Active" : "Open"}
           </p>
@@ -136,23 +147,30 @@ function NavLink({
 function SidebarContent({
   pathname,
   compact = false,
-  onNavigate,
+  onMainNavigate,
+  onStockNavigate,
 }: {
   pathname: string;
   compact?: boolean;
-  onNavigate?: () => void;
+  onMainNavigate?: (item: NavItem) => void;
+  onStockNavigate?: (item: NavItem) => void;
 }) {
-  const showStockNav = pathname.startsWith("/stock") || pathname.startsWith("/withdraw");
+  const showStockNav =
+    pathname.startsWith("/stock") || pathname.startsWith("/withdraw");
 
   return (
     <div className="flex h-full flex-col">
-      <div className={`flex items-center gap-3 ${compact ? "justify-center" : ""}`}>
+      <div
+        className={`flex items-center gap-3 ${compact ? "justify-center" : ""}`}
+      >
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-cyan-400 to-blue-600 text-lg font-black shadow-[0_20px_50px_-20px_rgba(34,211,238,0.7)]">
           Q
         </div>
         {!compact && (
           <div>
-            <p className="text-xl font-black tracking-tight text-white">QuickPOS</p>
+            <p className="text-xl font-black tracking-tight text-white">
+              QuickPOS
+            </p>
             <p className="text-xs uppercase tracking-[0.25em] text-slate-400">
               Store Console
             </p>
@@ -167,7 +185,7 @@ function SidebarContent({
             item={item}
             pathname={pathname}
             compact={compact}
-            onClick={onNavigate}
+            onClick={() => onMainNavigate?.(item)}
           />
         ))}
       </nav>
@@ -186,7 +204,7 @@ function SidebarContent({
                 item={item}
                 pathname={pathname}
                 compact={compact}
-                onClick={onNavigate}
+                onClick={() => onStockNavigate?.(item)}
               />
             ))}
           </div>
@@ -205,59 +223,71 @@ export function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+  const isMobileMenuOpen = mobileOpen;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
 
     const originalOverflow = document.body.style.overflow;
-    if (mobileOpen) {
+    if (isMobileMenuOpen) {
       document.body.style.overflow = "hidden";
     }
 
     return () => {
       document.body.style.overflow = originalOverflow;
     };
-  }, [mobileOpen]);
+  }, [isMobileMenuOpen]);
 
   return (
     <div
       className={`min-h-screen bg-[#0b0f19] text-white ${
-        lockDesktopViewport ? "xl:max-h-screen xl:overflow-hidden" : ""
+        lockDesktopViewport ? "2xl:max-h-screen 2xl:overflow-hidden" : ""
       }`}
     >
-      <div className="hidden md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-[300px] md:border-r md:border-white/[0.06] md:bg-[#0a0f18]/95 md:backdrop-blur-2xl">
-        <div className="h-full w-full p-4">
+      <div className="hidden 2xl:fixed 2xl:inset-y-0 2xl:left-0 2xl:z-40 2xl:flex 2xl:w-[300px] 2xl:border-r 2xl:border-white/[0.06] 2xl:bg-[#0a0f18]/95 2xl:backdrop-blur-2xl">
+        <div
+          className="h-full w-full overflow-y-auto p-4"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           <SidebarContent pathname={pathname} />
         </div>
       </div>
 
-      <div className="md:hidden">
+      <div className="2xl:hidden">
         <div className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#0b0f19]/95 backdrop-blur-2xl">
           <div className="px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-lg font-black tracking-tight text-white">{title}</p>
-                {subtitle && <p className="truncate text-sm text-slate-400">{subtitle}</p>}
+                <p className="truncate text-lg font-black tracking-tight text-white">
+                  {title}
+                </p>
+                {subtitle && (
+                  <p className="truncate text-sm text-slate-400">{subtitle}</p>
+                )}
               </div>
               <button
                 type="button"
                 onClick={() => setMobileOpen(true)}
                 aria-label="Open navigation"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] px-2 text-xs font-black uppercase tracking-[0.2em]"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] px-2"
               >
-                Menu
+                <span aria-hidden="true" className="space-y-1">
+                  <span className="block h-0.5 w-4 rounded-full bg-white" />
+                  <span className="block h-0.5 w-4 rounded-full bg-white" />
+                  <span className="block h-0.5 w-4 rounded-full bg-white" />
+                </span>
               </button>
             </div>
-            {actions && <div className="mt-3 flex flex-wrap items-center gap-2">{actions}</div>}
+            {actions && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {actions}
+              </div>
+            )}
           </div>
         </div>
 
-        {mobileOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 2xl:hidden">
             <button
               type="button"
               aria-label="Close navigation"
@@ -270,7 +300,9 @@ export function AppShell({
             >
               <div className="flex items-center justify-between border-b border-white/[0.06] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
                 <div className="min-w-0">
-                  <p className="text-lg font-black tracking-tight text-white">QuickPOS</p>
+                  <p className="text-lg font-black tracking-tight text-white">
+                    QuickPOS
+                  </p>
                   <p className="text-xs uppercase tracking-[0.25em] text-slate-400">
                     Navigation
                   </p>
@@ -288,22 +320,47 @@ export function AppShell({
                 className="flex-1 overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
                 style={{ WebkitOverflowScrolling: "touch" }}
               >
-                <SidebarContent pathname={pathname} onNavigate={() => setMobileOpen(false)} />
+                <SidebarContent
+                  pathname={pathname}
+                  onMainNavigate={(item) => {
+                    const isStockEntry =
+                      item.href === "/stock/warehouse" ||
+                      item.match?.(pathname) === true;
+
+                    if (!isStockEntry) {
+                      setMobileOpen(false);
+                    }
+                  }}
+                  onStockNavigate={() => {
+                    setMobileOpen(false);
+                  }}
+                />
               </div>
             </div>
           </div>
         )}
       </div>
 
-      <div className="md:pl-[300px]">
-        <div className="hidden items-center justify-between border-b border-white/[0.06] bg-[#0b0f19]/85 px-6 py-4 backdrop-blur-2xl md:flex lg:px-10">
+      <div className="2xl:pl-[300px]">
+        <div className="hidden items-center justify-between border-b border-white/[0.06] bg-[#0b0f19]/85 px-6 py-4 backdrop-blur-2xl 2xl:flex">
           <div className="min-w-0">
-            <h1 className="truncate text-3xl font-black tracking-tight text-white">{title}</h1>
-            {subtitle && <p className="mt-1 truncate text-base text-slate-400">{subtitle}</p>}
+            <h1 className="truncate text-3xl font-black tracking-tight text-white">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="mt-1 truncate text-base text-slate-400">
+                {subtitle}
+              </p>
+            )}
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
         </div>
-        <div className="px-4 py-4 pb-6 sm:px-6 md:px-6 lg:px-10 lg:py-6">{children}</div>
+        <div className="px-4 py-4 pb-6 sm:px-6 lg:px-10 lg:py-6">
+          {children}
+          <footer className="mt-8 border-t border-white/[0.06] pt-4 text-center text-xs font-medium tracking-[0.14em] text-slate-500">
+            {APP_VERSION} • Deverlop by Abyse Eclis
+          </footer>
+        </div>
       </div>
     </div>
   );

@@ -29,7 +29,12 @@ const MOVEMENT_HEADERS = [
   "note",
 ];
 
+interface SheetRowLike {
+  get: (field: string) => string | number | undefined;
+}
+
 export type StockMovementType =
+  | "warehouse_opening"
   | "receive_to_warehouse"
   | "move_to_storefront"
   | "return_to_warehouse"
@@ -83,7 +88,7 @@ export async function getMovementSheet(doc: GoogleSpreadsheet) {
   return getOrCreateSheet(doc, MOVEMENT_SHEET_TITLE, MOVEMENT_HEADERS);
 }
 
-export function rowToSession(row: any): StockSessionRecord {
+export function rowToSession(row: SheetRowLike): StockSessionRecord {
   return {
     session_id: row.get("session_id") || "",
     label: row.get("label") || "",
@@ -93,7 +98,7 @@ export function rowToSession(row: any): StockSessionRecord {
   };
 }
 
-export function rowToMovement(row: any): StockMovementRecord {
+export function rowToMovement(row: SheetRowLike): StockMovementRecord {
   return {
     movement_id: row.get("movement_id") || "",
     session_id: row.get("session_id") || "",
@@ -175,7 +180,10 @@ export async function getSessionStockSnapshot(
 
     const item = ensureKey(key);
 
-    if (movement.movement_type === "receive_to_warehouse") {
+    if (
+      movement.movement_type === "warehouse_opening" ||
+      movement.movement_type === "receive_to_warehouse"
+    ) {
       item.warehouseBalance += movement.qty_piece;
       continue;
     }

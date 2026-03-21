@@ -39,13 +39,16 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
         <button
           type="button"
           onClick={clearCart}
-          className="text-sm font-black uppercase tracking-[0.18em] text-slate-400 transition hover:text-rose-300"
+          className="whitespace-nowrap text-sm font-black uppercase tracking-[0.18em] text-slate-400 transition hover:text-rose-300"
         >
           ล้างตะกร้า
         </button>
       </div>
 
-      <div className="overflow-y-auto px-5 py-4" style={{ scrollbarWidth: "none" }}>
+      <div
+        className="overflow-y-auto px-5 py-4"
+        style={{ scrollbarWidth: "none" }}
+      >
         {cart.length === 0 ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-4 text-center text-slate-600">
             <span className="text-6xl opacity-40">🛒</span>
@@ -71,8 +74,12 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-black text-slate-100">{item.name}</p>
-                  <p className="mt-1 text-base text-slate-400">{item.price.toLocaleString()} ฿</p>
+                  <p className="truncate text-base font-black text-slate-100">
+                    {item.name}
+                  </p>
+                  <p className="mt-1 text-base text-slate-400">
+                    {item.price.toLocaleString()} ฿
+                  </p>
                   <div className="mt-3 flex items-center gap-3">
                     <button
                       type="button"
@@ -119,7 +126,7 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({
           type="button"
           onClick={openCheckout}
           disabled={cart.length === 0}
-          className="mt-4 w-full rounded-[28px] bg-linear-to-r from-cyan-500 to-blue-500 px-5 py-4 text-base font-black text-white shadow-xl shadow-cyan-500/20 transition active:scale-[0.98] disabled:opacity-20"
+          className="mt-4 w-full whitespace-nowrap rounded-[28px] bg-linear-to-r from-cyan-500 to-blue-500 px-5 py-4 text-base font-black text-white shadow-xl shadow-cyan-500/20 transition active:scale-[0.98] disabled:opacity-20"
         >
           สรุปยอดชำระเงิน
         </button>

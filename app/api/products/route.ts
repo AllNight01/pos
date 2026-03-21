@@ -1,5 +1,31 @@
 import { NextResponse } from "next/server";
-import { getSpreadsheet } from "../_lib/googleSheets";
+import {
+  getRowValue,
+  getSheetByAnyTitle,
+  getSpreadsheet,
+} from "../_lib/googleSheets";
+
+interface ProductRecord {
+  sku_code: string;
+  name: string;
+  price: number;
+  cost: number;
+  image: string;
+  category: string;
+  is_active: boolean;
+  consumable_id: string;
+  packs_per_crate: number;
+  pieces_per_pack: number;
+  conversion_rate: number;
+  is_inventory: boolean;
+}
+
+const PRODUCTS_CACHE_TTL_MS = 60 * 1000;
+
+let productsCache: {
+  products: ProductRecord[];
+  expiresAt: number;
+} | null = null;
 
 function parseBoolean(value: unknown, defaultValue = true) {
   const normalized = String(value || "").trim().toUpperCase();
@@ -38,39 +64,86 @@ function buildFallbackId(name: string, index: number) {
 
 async function getProductsSheet() {
   const doc = await getSpreadsheet();
-  const sheet = doc.sheetsByTitle["สินค้า"];
+  const sheet = getSheetByAnyTitle(doc, "สินค้า");
   if (!sheet) {
     throw new Error("ไม่พบ sheet 'สินค้า'");
   }
   return sheet;
 }
 
-async function ensureHeader(sheet: Awaited<ReturnType<typeof getProductsSheet>>, header: string) {
+async function ensureHeader(
+  sheet: Awaited<ReturnType<typeof getProductsSheet>>,
+  header: string,
+) {
   await sheet.loadHeaderRow();
   if (!sheet.headerValues.includes(header)) {
     await sheet.setHeaderRow([...sheet.headerValues, header]);
   }
 }
 
+function readCachedProducts() {
+  if (!productsCache) return null;
+  if (Date.now() > productsCache.expiresAt) return null;
+  return productsCache.products;
+}
+
+function writeProductsCache(products: ProductRecord[]) {
+  productsCache = {
+    products,
+    expiresAt: Date.now() + PRODUCTS_CACHE_TTL_MS,
+  };
+}
+
+function invalidateProductsCache() {
+  productsCache = null;
+}
+
 export async function GET() {
+  const cached = readCachedProducts();
+  if (cached) {
+    return NextResponse.json({ success: true, products: cached, cached: true });
+  }
+
   try {
     const sheet = await getProductsSheet();
     const rows = await sheet.getRows();
 
-    const products = rows
+    const products: ProductRecord[] = rows
       .map((row, index) => {
-        const skuRaw = row.get("รหัส SKU") || row.get("sku_code") || "";
-        const name = (row.get("ชื่อสินค้า") || row.get("name") || "").trim();
+        const skuRaw = getRowValue(row, "รหัส SKU", "sku_code");
+        const name = String(getRowValue(row, "ชื่อสินค้า", "name")).trim();
         if (!name) return null;
 
         const skuCode = normalizeSku(skuRaw) || buildFallbackId(name, index);
-        const price = Number(row.get("ราคาขาย (บาท)") || row.get("price")) || 0;
-        const cost = Number(row.get("ราคาทุน (บาท)") || row.get("cost")) || 0;
-        const category = (row.get("หมวดหมู่") || row.get("category") || "").trim();
-        const image = normalizeImagePath(String(row.get("Path รูปภาพ") || row.get("image") || ""));
-        const consumableId = (row.get("ตัดวัสดุ") || row.get("consumable_id") || "").trim();
-        const packsPerCrate = Number(row.get("จำนวนแพ็คต่อ ลัง") || row.get("จำนวนแพ็คต่อลัง") || row.get("packs_per_crate")) || 0;
-        const piecesPerPack = Number(row.get("จำนวนชิ้นต่อแพ็ค") || row.get("จำนวนต่อหน่วยใหญ่") || row.get("pieces_per_pack")) || 0;
+        const price = Number(getRowValue(row, "ราคาขาย (บาท)", "price")) || 0;
+        const cost = Number(getRowValue(row, "ราคาทุน (บาท)", "cost")) || 0;
+        const category = String(
+          getRowValue(row, "หมวดหมู่", "category"),
+        ).trim();
+        const image = normalizeImagePath(
+          String(getRowValue(row, "Path รูปภาพ", "image") || ""),
+        );
+        const consumableId = String(
+          getRowValue(row, "ตัดวัสดุ", "consumable_id"),
+        ).trim();
+        const packsPerCrate =
+          Number(
+            getRowValue(
+              row,
+              "จำนวนแพ็คต่อ ลัง",
+              "จำนวนแพ็คต่อลัง",
+              "packs_per_crate",
+            ),
+          ) || 0;
+        const piecesPerPack =
+          Number(
+            getRowValue(
+              row,
+              "จำนวนชิ้นต่อแพ็ค",
+              "จำนวนต่อหน่วยใหญ่",
+              "pieces_per_pack",
+            ),
+          ) || 0;
         const isInventory = parseBoolean(row.get("is_inventory"), true);
         const isActive = parseBoolean(row.get("is_active"), true);
 
@@ -89,10 +162,20 @@ export async function GET() {
           is_inventory: isInventory,
         };
       })
-      .filter(Boolean);
+      .filter((product): product is ProductRecord => product !== null);
 
-    return NextResponse.json({ success: true, products });
+    writeProductsCache(products);
+    return NextResponse.json({ success: true, products, cached: false });
   } catch (error) {
+    if (productsCache?.products.length) {
+      return NextResponse.json({
+        success: true,
+        products: productsCache.products,
+        cached: true,
+        stale: true,
+      });
+    }
+
     const message = error instanceof Error ? error.message : "โหลดสินค้าไม่สำเร็จ";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
@@ -109,11 +192,17 @@ export async function PATCH(request: Request) {
     const isActive = Boolean(body.is_active);
 
     if (!skuCode) {
-      return NextResponse.json({ success: false, error: "ไม่พบรหัสสินค้า" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "ไม่พบรหัสสินค้า" },
+        { status: 400 },
+      );
     }
 
     if (!name) {
-      return NextResponse.json({ success: false, error: "กรุณาระบุชื่อสินค้า" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "กรุณาระบุชื่อสินค้า" },
+        { status: 400 },
+      );
     }
 
     const sheet = await getProductsSheet();
@@ -121,14 +210,18 @@ export async function PATCH(request: Request) {
     const rows = await sheet.getRows();
 
     const targetRow = rows.find((row, index) => {
-      const rowName = String(row.get("ชื่อสินค้า") || row.get("name") || "").trim();
+      const rowName = String(getRowValue(row, "ชื่อสินค้า", "name")).trim();
       const rowSku =
-        normalizeSku(row.get("รหัส SKU") || row.get("sku_code")) || buildFallbackId(rowName, index);
+        normalizeSku(getRowValue(row, "รหัส SKU", "sku_code")) ||
+        buildFallbackId(rowName, index);
       return rowSku === skuCode;
     });
 
     if (!targetRow) {
-      return NextResponse.json({ success: false, error: "ไม่พบสินค้าที่ต้องการแก้ไข" }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "ไม่พบสินค้าที่ต้องการแก้ไข" },
+        { status: 404 },
+      );
     }
 
     targetRow.set("name", name);
@@ -142,9 +235,11 @@ export async function PATCH(request: Request) {
     targetRow.set("is_active", isActive ? "TRUE" : "FALSE");
     await targetRow.save();
 
+    invalidateProductsCache();
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "บันทึกสินค้าไม่สำเร็จ";
+    const message =
+      error instanceof Error ? error.message : "บันทึกสินค้าไม่สำเร็จ";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

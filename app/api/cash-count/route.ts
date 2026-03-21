@@ -2,14 +2,41 @@ import { NextResponse } from "next/server";
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
 
+const COLUMN = {
+  date: "\u0e27\u0e31\u0e19\u0e17\u0e35\u0e48",
+  startingCash: "\u0e40\u0e07\u0e34\u0e19\u0e17\u0e2d\u0e19\u0e15\u0e31\u0e49\u0e07\u0e15\u0e49\u0e19",
+  cashSales: "\u0e22\u0e2d\u0e14\u0e02\u0e32\u0e22\u0e40\u0e07\u0e34\u0e19\u0e2a\u0e14",
+  transferSales: "\u0e22\u0e2d\u0e14\u0e02\u0e32\u0e22\u0e42\u0e2d\u0e19",
+  expectedCash: "\u0e22\u0e2d\u0e14\u0e04\u0e27\u0e23\u0e21\u0e35",
+  actualCash: "\u0e19\u0e31\u0e1a\u0e40\u0e07\u0e34\u0e19\u0e08\u0e23\u0e34\u0e07",
+  difference: "\u0e2a\u0e48\u0e27\u0e19\u0e15\u0e48\u0e32\u0e07",
+  billCount: "\u0e08\u0e33\u0e19\u0e27\u0e19\u0e18\u0e19\u0e1a\u0e31\u0e15\u0e23",
+  coinCount: "\u0e08\u0e33\u0e19\u0e27\u0e19\u0e40\u0e2b\u0e23\u0e35\u0e22\u0e0d",
+} as const;
+
+const DENOMINATION_COLUMNS = [
+  { value: 1000, type: "bill", column: "\u0e18\u0e19\u0e1a\u0e31\u0e15\u0e23 1000" },
+  { value: 500, type: "bill", column: "\u0e18\u0e19\u0e1a\u0e31\u0e15\u0e23 500" },
+  { value: 100, type: "bill", column: "\u0e18\u0e19\u0e1a\u0e31\u0e15\u0e23 100" },
+  { value: 50, type: "bill", column: "\u0e18\u0e19\u0e1a\u0e31\u0e15\u0e23 50" },
+  { value: 20, type: "bill", column: "\u0e18\u0e19\u0e1a\u0e31\u0e15\u0e23 20" },
+  { value: 10, type: "coin", column: "\u0e40\u0e2b\u0e23\u0e35\u0e22\u0e0d 10" },
+  { value: 5, type: "coin", column: "\u0e40\u0e2b\u0e23\u0e35\u0e22\u0e0d 5" },
+  { value: 2, type: "coin", column: "\u0e40\u0e2b\u0e23\u0e35\u0e22\u0e0d 2" },
+  { value: 1, type: "coin", column: "\u0e40\u0e2b\u0e23\u0e35\u0e22\u0e0d 1" },
+] as const;
+
 const HEADERS = [
-  "วันที่",
-  "เงินทอนตั้งต้น",
-  "ยอดขายเงินสด",
-  "ยอดขายโอน",
-  "ยอดควรมี",
-  "นับเงินจริง",
-  "ส่วนต่าง",
+  COLUMN.date,
+  COLUMN.startingCash,
+  COLUMN.cashSales,
+  COLUMN.transferSales,
+  COLUMN.expectedCash,
+  COLUMN.actualCash,
+  COLUMN.difference,
+  COLUMN.billCount,
+  COLUMN.coinCount,
+  ...DENOMINATION_COLUMNS.map((item) => item.column),
 ];
 
 function getTodayDateStr() {
@@ -21,14 +48,46 @@ function getTodayDateStr() {
   return `${dd}-${mm}-${yyyy}`;
 }
 
+function toNumber(value: unknown) {
+  return Number(value) || 0;
+}
+
+function normalizeCounts(input: unknown) {
+  const source =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+
+  const counts: Record<number, number> = {};
+  for (const item of DENOMINATION_COLUMNS) {
+    counts[item.value] = toNumber(source[String(item.value)]);
+  }
+  return counts;
+}
+
+function buildCountsFromRow(row: { get: (key: string) => unknown }) {
+  const counts: Record<number, number> = {};
+  for (const item of DENOMINATION_COLUMNS) {
+    counts[item.value] = toNumber(row.get(item.column));
+  }
+  return counts;
+}
+
 async function getCashCountSheet(doc: GoogleSpreadsheet) {
-  let sheet = doc.sheetsByTitle["นับเงินรายวัน"];
+  let sheet = doc.sheetsByTitle["\u0e19\u0e31\u0e1a\u0e40\u0e07\u0e34\u0e19\u0e23\u0e32\u0e22\u0e27\u0e31\u0e19"];
   if (!sheet) {
     sheet = await doc.addSheet({
-      title: "นับเงินรายวัน",
+      title: "\u0e19\u0e31\u0e1a\u0e40\u0e07\u0e34\u0e19\u0e23\u0e32\u0e22\u0e27\u0e31\u0e19",
       headerValues: HEADERS,
     });
   }
+
+  await sheet.loadHeaderRow();
+  const missingHeaders = HEADERS.filter((header) => !sheet.headerValues.includes(header));
+  if (missingHeaders.length > 0) {
+    await sheet.setHeaderRow([...sheet.headerValues, ...missingHeaders]);
+  }
+
   return sheet;
 }
 
@@ -48,19 +107,22 @@ export async function GET(req: Request) {
     const sheet = await getCashCountSheet(doc);
     const rows = await sheet.getRows();
 
-    const row = rows.find((r) => r.get("วันที่") === date);
+    const row = rows.find((item) => item.get(COLUMN.date) === date);
 
     if (row) {
       return NextResponse.json({
         success: true,
         data: {
           date,
-          starting_cash: Number(row.get("เงินทอนตั้งต้น")) || 0,
-          cash_sales: Number(row.get("ยอดขายเงินสด")) || 0,
-          transfer_sales: Number(row.get("ยอดขายโอน")) || 0,
-          expected_cash: Number(row.get("ยอดควรมี")) || 0,
-          actual_cash: Number(row.get("นับเงินจริง")) || 0,
-          difference: Number(row.get("ส่วนต่าง")) || 0,
+          starting_cash: toNumber(row.get(COLUMN.startingCash)),
+          cash_sales: toNumber(row.get(COLUMN.cashSales)),
+          transfer_sales: toNumber(row.get(COLUMN.transferSales)),
+          expected_cash: toNumber(row.get(COLUMN.expectedCash)),
+          actual_cash: toNumber(row.get(COLUMN.actualCash)),
+          difference: toNumber(row.get(COLUMN.difference)),
+          bill_count: toNumber(row.get(COLUMN.billCount)),
+          coin_count: toNumber(row.get(COLUMN.coinCount)),
+          counts: buildCountsFromRow(row),
         },
       });
     }
@@ -75,6 +137,9 @@ export async function GET(req: Request) {
         expected_cash: 0,
         actual_cash: 0,
         difference: 0,
+        bill_count: 0,
+        coin_count: 0,
+        counts: Object.fromEntries(DENOMINATION_COLUMNS.map((item) => [item.value, 0])),
       },
     });
   } catch (error: any) {
@@ -93,11 +158,16 @@ export async function POST(req: Request) {
       expected_cash,
       actual_cash,
       difference,
+      bill_count,
+      coin_count,
+      counts,
     } = body;
 
     if (!date) {
       return NextResponse.json({ success: false, error: "Missing date" }, { status: 400 });
     }
+
+    const normalizedCounts = normalizeCounts(counts);
 
     const serviceAccountAuth = new JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -110,21 +180,27 @@ export async function POST(req: Request) {
     const sheet = await getCashCountSheet(doc);
     const rows = await sheet.getRows();
 
-    const existingRow = rows.find((r) => r.get("วันที่") === date);
+    const existingRow = rows.find((item) => item.get(COLUMN.date) === date);
 
-    const rowData = {
-      "วันที่": date,
-      "เงินทอนตั้งต้น": starting_cash || 0,
-      "ยอดขายเงินสด": cash_sales || 0,
-      "ยอดขายโอน": transfer_sales || 0,
-      "ยอดควรมี": expected_cash || 0,
-      "นับเงินจริง": actual_cash || 0,
-      "ส่วนต่าง": difference || 0,
+    const rowData: Record<string, number | string> = {
+      [COLUMN.date]: date,
+      [COLUMN.startingCash]: toNumber(starting_cash),
+      [COLUMN.cashSales]: toNumber(cash_sales),
+      [COLUMN.transferSales]: toNumber(transfer_sales),
+      [COLUMN.expectedCash]: toNumber(expected_cash),
+      [COLUMN.actualCash]: toNumber(actual_cash),
+      [COLUMN.difference]: toNumber(difference),
+      [COLUMN.billCount]: toNumber(bill_count),
+      [COLUMN.coinCount]: toNumber(coin_count),
     };
 
+    for (const item of DENOMINATION_COLUMNS) {
+      rowData[item.column] = normalizedCounts[item.value] || 0;
+    }
+
     if (existingRow) {
-      Object.entries(rowData).forEach(([key, val]) => {
-        existingRow.set(key, val);
+      Object.entries(rowData).forEach(([key, value]) => {
+        existingRow.set(key, value);
       });
       await existingRow.save();
     } else {

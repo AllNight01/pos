@@ -39,7 +39,9 @@ export default function ProductRankingPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/product-ranking?days=${days}&sortBy=${sortBy}`);
+        const res = await fetch(
+          `/api/product-ranking?days=${days}&sortBy=${sortBy}`,
+        );
         const data = await res.json();
         if (!res.ok || !data.success) {
           throw new Error(data.error || "โหลดอันดับสินค้าไม่สำเร็จ");
@@ -47,7 +49,11 @@ export default function ProductRankingPage() {
         setItems(data.items || []);
         setDates(data.dates || []);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "โหลดอันดับสินค้าไม่สำเร็จ");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "โหลดอันดับสินค้าไม่สำเร็จ",
+        );
       } finally {
         setLoading(false);
       }
@@ -57,7 +63,10 @@ export default function ProductRankingPage() {
   }, [days, sortBy]);
 
   return (
-    <AppShell title="จัดอันดับสินค้า" subtitle="ดูสินค้าขายดีจากยอดขายจริงใน Google Sheet">
+    <AppShell
+      title="จัดอันดับสินค้า"
+      subtitle="ดูสินค้าขายดีจากยอดขายจริงใน Google Sheet"
+    >
       <div className="space-y-5">
         <section className="rounded-[32px] border border-white/[0.06] bg-linear-to-br from-white/[0.04] via-white/[0.03] to-white/[0.01] p-5 shadow-2xl shadow-black/30 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -65,9 +74,12 @@ export default function ProductRankingPage() {
               <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">
                 Product Ranking
               </p>
-              <h2 className="mt-3 text-3xl font-black text-white">จัดเรียงสินค้าขายดี</h2>
+              <h2 className="mt-3 text-3xl font-black text-white">
+                จัดเรียงสินค้าขายดี
+              </h2>
               <p className="mt-3 max-w-3xl text-base leading-7 text-slate-300">
-                ใช้ดูว่าสินค้าตัวไหนขายดีในช่วงเวลาที่เลือก และเรียงได้ทั้งตามจำนวนขายและตามรายได้
+                ใช้ดูว่าสินค้าตัวไหนขายดีในช่วงเวลาที่เลือก
+                และเรียงได้ทั้งตามจำนวนขายและตามรายได้
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -118,7 +130,10 @@ export default function ProductRankingPage() {
           </div>
 
           <p className="mt-4 text-base text-slate-400">
-            ช่วงข้อมูลที่ใช้: {dates.length > 0 ? `${dates[dates.length - 1]} ถึง ${dates[0]}` : "-"}
+            ช่วงข้อมูลที่ใช้:{" "}
+            {dates.length > 0
+              ? `${dates[dates.length - 1]} ถึง ${dates[0]}`
+              : "-"}
           </p>
         </section>
 
@@ -152,33 +167,56 @@ export default function ProductRankingPage() {
                         alt={item.name}
                         className="h-full w-full object-contain"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/image/empty.jpg";
+                          (e.target as HTMLImageElement).src =
+                            "/image/empty.jpg";
                         }}
                       />
                     </div>
                     <div className="min-w-0">
-                      <p className="line-clamp-2 text-lg font-black text-white">{item.name}</p>
-                      <p className="mt-1 break-all text-sm text-slate-400">{item.sku_code || "-"}</p>
-                      <p className="mt-1 text-sm text-slate-400">{item.category || "ไม่ระบุหมวดหมู่"}</p>
+                      <p className="line-clamp-2 text-lg font-black text-white">
+                        {item.name}
+                      </p>
+                      <p className="mt-1 break-all text-sm text-slate-400">
+                        {item.sku_code || "-"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {item.category || "ไม่ระบุหมวดหมู่"}
+                      </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 sm:min-w-[360px] sm:grid-cols-4">
                     <div className="rounded-2xl border border-white/[0.05] bg-black/20 px-3 py-3 text-center">
-                      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-400">จำนวนขาย</p>
-                      <p className="mt-2 text-2xl font-black text-cyan-300">{item.qty.toLocaleString()}</p>
+                      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-400">
+                        จำนวนขาย
+                      </p>
+                      <p className="mt-2 text-2xl font-black text-cyan-300">
+                        {item.qty.toLocaleString()}
+                      </p>
                     </div>
                     <div className="rounded-2xl border border-white/[0.05] bg-black/20 px-3 py-3 text-center">
-                      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-400">รายได้</p>
-                      <p className="mt-2 text-2xl font-black text-emerald-300">{item.revenue.toLocaleString()}</p>
+                      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-400">
+                        รายได้
+                      </p>
+                      <p className="mt-2 text-2xl font-black text-emerald-300">
+                        {item.revenue.toLocaleString()}
+                      </p>
                     </div>
                     <div className="rounded-2xl border border-white/[0.05] bg-black/20 px-3 py-3 text-center">
-                      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-400">จำนวนบิล</p>
-                      <p className="mt-2 text-2xl font-black text-violet-300">{item.bills.toLocaleString()}</p>
+                      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-400">
+                        จำนวนบิล
+                      </p>
+                      <p className="mt-2 text-2xl font-black text-violet-300">
+                        {item.bills.toLocaleString()}
+                      </p>
                     </div>
                     <div className="rounded-2xl border border-white/[0.05] bg-black/20 px-3 py-3 text-center">
-                      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-400">ราคาเฉลี่ย</p>
-                      <p className="mt-2 text-2xl font-black text-amber-300">{item.averagePrice.toLocaleString()}</p>
+                      <p className="text-sm font-black uppercase tracking-[0.16em] text-slate-400">
+                        ราคาเฉลี่ย
+                      </p>
+                      <p className="mt-2 text-2xl font-black text-amber-300">
+                        {item.averagePrice.toLocaleString()}
+                      </p>
                     </div>
                   </div>
                 </div>

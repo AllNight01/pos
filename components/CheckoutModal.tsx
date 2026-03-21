@@ -1,12 +1,10 @@
 "use client";
 
 import React from "react";
-import { CartItem } from "./PosTypes";
 
 interface CheckoutModalProps {
   showCheckout: boolean;
   setShowCheckout: (show: boolean) => void;
-  cart: CartItem[];
   totalPrice: number;
   paymentMethod: "cash" | "transfer";
   setPaymentMethod: (method: "cash" | "transfer") => void;
@@ -19,10 +17,12 @@ interface CheckoutModalProps {
   loading: boolean;
 }
 
+const NUMPAD_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, "0", "00", "C"] as const;
+const QUICK_CASH_AMOUNTS = [1000, 500, 100, 50, 20, 10, 5, 2, 1] as const;
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   showCheckout,
   setShowCheckout,
-  cart,
   totalPrice,
   paymentMethod,
   setPaymentMethod,
@@ -40,20 +40,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     paymentMethod === "transfer" ||
     (receivedAmount && Number(receivedAmount) >= totalPrice);
 
+  const handleNumpadPress = (key: (typeof NUMPAD_KEYS)[number]) => {
+    if (key === "C") {
+      setReceivedAmount("");
+      return;
+    }
+    setReceivedAmount(receivedAmount + String(key));
+  };
+
+  const handleQuickCashSelect = (amount: number) => {
+    const currentAmount = Number(receivedAmount) || 0;
+    setReceivedAmount(String(currentAmount + amount));
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 lg:p-8">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4 lg:p-8">
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-xl"
         onClick={handleCloseCheckout}
       />
-      {/* 
-        Mobile: full-screen bottom sheet layout using grid rows
-        - header (auto)
-        - scrollable content (1fr)
-        - sticky confirm button (auto) — always visible!
-      */}
+
       <div
-        className="relative w-full sm:max-w-lg lg:max-w-2xl bg-[#0b0f19] border-t-2 sm:border-2 border-white/[0.08] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] overflow-hidden rounded-t-3xl sm:rounded-[40px] lg:rounded-[50px]"
+        className="relative w-full overflow-hidden rounded-t-3xl border-t-2 border-white/[0.08] bg-[#0b0f19] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] sm:max-w-lg sm:rounded-[40px] sm:border-2 lg:max-w-[80dvw] lg:rounded-[50px]"
         style={{
           animation: "slide-up .4s cubic-bezier(0.16, 1, 0.3, 1) both",
           maxHeight: "100dvh",
@@ -63,185 +71,296 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       >
         {!checkoutDone ? (
           <>
-            {/* ───── HEADER ───── */}
-            <div className="px-4 sm:px-8 lg:px-10 py-2.5 sm:py-6 lg:py-8 border-b border-white/[0.04] flex items-center justify-between shrink-0">
-              <h3 className="text-base sm:text-2xl lg:text-3xl font-black text-white italic tracking-tighter uppercase">
+            <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-2.5 sm:px-8 sm:py-6 lg:px-10 lg:py-8">
+              <h3 className="text-base font-black uppercase italic tracking-tighter text-white sm:text-2xl lg:text-3xl">
                 ชำระเงิน
               </h3>
               <button
+                type="button"
                 onClick={handleCloseCheckout}
-                className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-white/[0.04] text-slate-400 hover:text-white transition-all text-base sm:text-xl font-bold flex items-center justify-center"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.04] text-base font-bold text-slate-400 transition-all hover:text-white sm:h-12 sm:w-12 sm:text-xl"
               >
-                ✕
+                ×
               </button>
             </div>
 
-            {/* ───── SCROLLABLE CONTENT ───── */}
             <div
-              className="overflow-y-auto px-3 sm:px-8 lg:px-12 py-2.5 sm:py-8 lg:py-10 space-y-2.5 sm:space-y-8 lg:space-y-10"
+              className="overflow-y-auto px-3 pb-2.5 sm:px-8 sm:pb-8 lg:overflow-visible lg:px-10 lg:pb-8"
               style={{ scrollbarWidth: "none", minHeight: 0 }}
             >
-              {/* Total + Payment Method */}
-              <div className="flex items-center justify-between gap-3 sm:block">
-                <div className="sm:rounded-[40px] sm:bg-linear-to-br sm:from-white/[0.04] sm:to-transparent sm:border-2 sm:border-white/[0.1] sm:p-8 lg:p-10 sm:text-center sm:shadow-2xl sm:mb-8">
-                  <p className="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-[0.22em] sm:tracking-[0.3em] sm:mb-3">
-                    ยอดรวม
-                  </p>
-                  <p className="text-2xl sm:text-5xl lg:text-7xl font-black text-white tabular-nums tracking-tighter">
-                    {totalPrice.toLocaleString()}
-                    <span className="text-sm sm:text-xl lg:text-2xl ml-1 sm:ml-3 text-cyan-400">
-                      ฿
-                    </span>
-                  </p>
+              <div className="space-y-2.5 sm:space-y-8 lg:hidden">
+                <div className="flex items-center justify-between gap-3 sm:block">
+                  <div className="sm:mb-8 sm:rounded-[40px] sm:border-2 sm:border-white/[0.1] sm:bg-linear-to-br sm:from-white/[0.04] sm:to-transparent sm:p-8 sm:text-center sm:shadow-2xl">
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400 sm:mb-3 sm:text-sm sm:tracking-[0.3em]">
+                      ยอดรวม
+                    </p>
+                    <p className="text-2xl font-black tracking-tighter text-white tabular-nums sm:text-5xl">
+                      {totalPrice.toLocaleString()}
+                      <span className="ml-1 text-sm text-cyan-400 sm:ml-3 sm:text-xl">
+                        ฿
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1 sm:gap-4 sm:rounded-[32px] sm:border-2 sm:p-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("cash")}
+                      className={`flex items-center justify-center gap-1 whitespace-nowrap rounded-lg px-3.5 py-2.5 text-sm font-black transition-all sm:flex-1 sm:gap-3 sm:rounded-[24px] sm:px-6 sm:py-5 sm:text-lg ${
+                        paymentMethod === "cash"
+                          ? "bg-white text-black shadow-xl"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      💵 <span className="hidden sm:inline">เงินสด</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod("transfer")}
+                      className={`flex items-center justify-center gap-1 whitespace-nowrap rounded-lg px-3.5 py-2.5 text-sm font-black transition-all sm:flex-1 sm:gap-3 sm:rounded-[24px] sm:px-6 sm:py-5 sm:text-lg ${
+                        paymentMethod === "transfer"
+                          ? "bg-white text-black shadow-xl"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      💳 <span className="hidden sm:inline">เงินโอน</span>
+                    </button>
+                  </div>
                 </div>
-                {/* Payment toggle */}
-                <div className="flex gap-1 sm:gap-4 p-1 sm:p-2 bg-white/[0.03] rounded-xl sm:rounded-[32px] border sm:border-2 border-white/[0.06]">
-                  <button
-                    onClick={() => setPaymentMethod("cash")}
-                    className={`py-2.5 px-3.5 sm:py-5 sm:px-6 sm:flex-1 rounded-lg sm:rounded-[24px] text-sm sm:text-lg lg:text-xl font-black transition-all flex items-center justify-center gap-1 sm:gap-3 ${
-                      paymentMethod === "cash"
-                        ? "bg-white text-black shadow-xl"
-                        : "text-slate-500"
-                    }`}
-                  >
-                    💵 <span className="hidden sm:inline">เงินสด</span>
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethod("transfer")}
-                    className={`py-2.5 px-3.5 sm:py-5 sm:px-6 sm:flex-1 rounded-lg sm:rounded-[24px] text-sm sm:text-lg lg:text-xl font-black transition-all flex items-center justify-center gap-1 sm:gap-3 ${
-                      paymentMethod === "transfer"
-                        ? "bg-white text-black shadow-xl"
-                        : "text-slate-500"
-                    }`}
-                  >
-                    💳 <span className="hidden sm:inline">เงินโอน</span>
-                  </button>
-                </div>
+
+                {paymentMethod === "cash" ? (
+                  <div className="space-y-2.5 sm:space-y-8">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-6">
+                      <AmountCard
+                        label="รับเงินมา"
+                        value={receivedAmount || "0"}
+                        accent="text-emerald-400"
+                        border="border-emerald-500/20"
+                        bg="bg-[#0d1117]"
+                      />
+                      <AmountCard
+                        label="เงินทอน"
+                        value={
+                          changeAmount !== null
+                            ? changeAmount.toLocaleString()
+                            : "0"
+                        }
+                        accent={
+                          changeAmount !== null
+                            ? "text-white"
+                            : "text-slate-700"
+                        }
+                        border={
+                          changeAmount !== null
+                            ? "border-white/20"
+                            : "border-white/5"
+                        }
+                        bg={
+                          changeAmount !== null
+                            ? "bg-white/[0.04]"
+                            : "bg-[#0d1117]"
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 sm:space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => setReceivedAmount(totalPrice.toString())}
+                        className="w-full whitespace-nowrap rounded-xl bg-cyan-500 py-2 text-sm font-black text-black shadow-xl shadow-cyan-500/40 transition-all active:scale-[0.98] sm:rounded-[32px] sm:py-5 sm:text-xl"
+                      >
+                        จ่ายพอดี ({totalPrice.toLocaleString()} ฿)
+                      </button>
+                      <QuickCashButtons
+                        amounts={QUICK_CASH_AMOUNTS}
+                        onSelect={handleQuickCashSelect}
+                        mobile
+                      />
+                    </div>
+
+                    <NumpadGrid onPress={handleNumpadPress} mobile />
+                  </div>
+                ) : (
+                  <TransferPanel />
+                )}
               </div>
 
-              {paymentMethod === "cash" ? (
-                <div className="space-y-2.5 sm:space-y-8">
-                  {/* Amount display - compact 2-col */}
-                  <div className="grid grid-cols-2 gap-2 sm:gap-6">
-                    <div className="space-y-0.5 sm:space-y-4">
-                      <label className="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-[0.22em] text-center block">
-                        รับเงินมา
-                      </label>
-                      <div className="text-xl sm:text-4xl lg:text-5xl font-black text-emerald-400 tabular-nums bg-[#0d1117] border-2 border-emerald-500/20 rounded-xl sm:rounded-[32px] py-2 sm:py-6 lg:py-8 px-2 sm:px-4 min-h-[44px] sm:min-h-[100px] flex items-center justify-center shadow-inner break-all">
-                        {receivedAmount || "0"}
+              <div className="hidden lg:block">
+                {paymentMethod === "cash" ? (
+                  <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+                    <div className="space-y-6">
+                      <div className="rounded-[32px] border-2 border-white/[0.1] bg-linear-to-br from-white/[0.04] to-transparent p-8 shadow-2xl">
+                        <p className="text-sm font-black uppercase tracking-[0.3em] text-slate-400">
+                          ยอดรวม
+                        </p>
+                        <p className="mt-4 text-7xl font-black tracking-tighter text-white tabular-nums">
+                          {totalPrice.toLocaleString()}
+                          <span className="ml-3 text-2xl text-cyan-400">฿</span>
+                        </p>
                       </div>
-                    </div>
-                    <div className="space-y-0.5 sm:space-y-4">
-                      <label className="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-[0.22em] text-center block">
-                        เงินทอน
-                      </label>
-                      <div
-                        className={`text-xl sm:text-4xl lg:text-5xl font-black tabular-nums border-2 rounded-xl sm:rounded-[32px] py-2 sm:py-6 lg:py-8 px-2 sm:px-4 min-h-[44px] sm:min-h-[100px] flex items-center justify-center shadow-inner transition-all ${changeAmount !== null ? "bg-white/[0.04] border-white/20 text-white" : "bg-[#0d1117] border-white/5 text-slate-900"}`}
+
+                      <div className="flex gap-3 rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-2">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("cash")}
+                          className="flex-1 whitespace-nowrap rounded-[22px] bg-white px-5 py-4 text-lg font-black text-black shadow-xl transition-all"
+                        >
+                          💵 เงินสด
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("transfer")}
+                          className="flex-1 whitespace-nowrap rounded-[22px] px-5 py-4 text-lg font-black text-slate-500 transition-all"
+                        >
+                          💳 เงินโอน
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <AmountPanel
+                          label="รับเงินมา"
+                          value={receivedAmount || "0"}
+                          accent="text-emerald-300"
+                          border="border-emerald-500/20"
+                          bg="bg-emerald-500/10"
+                        />
+                        <AmountPanel
+                          label="เงินทอน"
+                          value={
+                            changeAmount !== null
+                              ? changeAmount.toLocaleString()
+                              : "0"
+                          }
+                          accent={
+                            changeAmount !== null
+                              ? "text-white"
+                              : "text-slate-700"
+                          }
+                          border="border-white/[0.08]"
+                          bg="bg-white/[0.03]"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setReceivedAmount(totalPrice.toString())}
+                        className="w-full whitespace-nowrap rounded-[24px] bg-cyan-500 px-5 py-4 text-xl font-black text-black shadow-xl shadow-cyan-500/40 transition-all active:scale-[0.98]"
                       >
-                        {changeAmount !== null
-                          ? `${changeAmount.toLocaleString()}`
-                          : "0"}
+                        à¸ˆà¹ˆà¸²à¸¢à¸žà¸­à¸”à¸µ ({totalPrice.toLocaleString()} à¸¿)
+                      </button>
+
+                      <QuickCashButtons
+                        amounts={QUICK_CASH_AMOUNTS}
+                        onSelect={handleQuickCashSelect}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleConfirmCheckout}
+                        disabled={loading || !canConfirm}
+                        className={`w-full whitespace-nowrap rounded-[28px] py-5 text-2xl font-black uppercase italic tracking-tighter text-white shadow-2xl transition-all active:scale-[0.98] ${
+                          canConfirm
+                            ? "bg-linear-to-r from-emerald-400 to-blue-600 shadow-blue-500/40"
+                            : "bg-slate-800 opacity-30 shadow-none"
+                        }`}
+                      >
+                        {loading ? "กำลังบันทึก..." : "ยืนยันชำระเงิน"}
+                      </button>
+                    </div>
+
+                    <div className="rounded-[32px] border border-white/[0.06] bg-[#0d1117] p-5">
+                      <NumpadGrid onPress={handleNumpadPress} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+                    <div className="space-y-6">
+                      <div className="rounded-[32px] border-2 border-white/[0.1] bg-linear-to-br from-white/[0.04] to-transparent p-8 shadow-2xl">
+                        <p className="text-sm font-black uppercase tracking-[0.3em] text-slate-400">
+                          ยอดรวม
+                        </p>
+                        <p className="mt-4 text-7xl font-black tracking-tighter text-white tabular-nums">
+                          {totalPrice.toLocaleString()}
+                          <span className="ml-3 text-2xl text-cyan-400">฿</span>
+                        </p>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Quick buttons: Exact + Banknotes */}
-                  <div className="space-y-1.5 sm:space-y-3">
-                    <button
-                      onClick={() => setReceivedAmount(totalPrice.toString())}
-                      className="w-full py-2 sm:py-5 rounded-xl sm:rounded-[32px] bg-cyan-500 text-black font-black text-sm sm:text-xl lg:text-2xl shadow-xl shadow-cyan-500/40 active:scale-[0.98] transition-all"
-                    >
-                      💵 จ่ายพอดี ({totalPrice.toLocaleString()} ฿)
-                    </button>
-                    <div className="grid grid-cols-5 gap-1 sm:gap-2">
-                      {[1000, 500, 100, 50, 20].map((amt) => (
+                      <div className="flex gap-3 rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-2">
                         <button
-                          key={amt}
-                          onClick={() => setReceivedAmount(String(amt))}
-                          className="py-1.5 sm:py-4 rounded-lg sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-black text-sm sm:text-base hover:bg-emerald-500/20 active:scale-90 transition-all"
+                          type="button"
+                          onClick={() => setPaymentMethod("cash")}
+                          className="flex-1 whitespace-nowrap rounded-[22px] px-5 py-4 text-lg font-black text-slate-500 transition-all"
                         >
-                          {amt}
+                          💵 เงินสด
                         </button>
-                      ))}
-                    </div>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("transfer")}
+                          className="flex-1 whitespace-nowrap rounded-[22px] bg-white px-5 py-4 text-lg font-black text-black shadow-xl transition-all"
+                        >
+                          💳 เงินโอน
+                        </button>
+                      </div>
 
-                  {/* Numpad - compact on mobile */}
-                  <div className="grid grid-cols-3 gap-1 sm:gap-4">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, "0", "00", "C"].map(
-                      (btn) => (
-                        <button
-                          key={btn}
-                          onClick={() => {
-                            if (btn === "C") setReceivedAmount("");
-                            else setReceivedAmount(receivedAmount + btn);
-                          }}
-                          className={`h-10 sm:h-20 lg:h-24 rounded-xl sm:rounded-[28px] ${
-                            btn === "C"
-                              ? "bg-red-500/10 text-red-400 border-red-500/20"
-                              : "bg-white/[0.04] text-white border-white/[0.06]"
-                          } border-2 font-black text-lg sm:text-3xl lg:text-4xl hover:bg-white/[0.08] active:scale-90 transition-all shadow-lg shadow-black/20`}
-                        >
-                          {btn}
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="py-6 sm:py-12 text-center space-y-4 sm:space-y-8">
-                  <div className="w-36 h-36 sm:w-56 sm:h-56 lg:w-64 lg:h-64 mx-auto bg-white rounded-2xl sm:rounded-[40px] flex items-center justify-center p-5 sm:p-8 shadow-2xl">
-                    <div className="text-black text-center space-y-2">
-                      <div className="text-2xl sm:text-4xl">📱</div>
-                      <p className="font-black text-base sm:text-lg lg:text-xl italic leading-tight uppercase">
-                        โอนเงินเข้าเครื่อง
-                        <br />
-                        SCAN QR
-                      </p>
+                      <button
+                        type="button"
+                        onClick={handleConfirmCheckout}
+                        disabled={loading || !canConfirm}
+                        className={`w-full whitespace-nowrap rounded-[28px] py-5 text-2xl font-black uppercase italic tracking-tighter text-white shadow-2xl transition-all active:scale-[0.98] ${
+                          canConfirm
+                            ? "bg-linear-to-r from-emerald-400 to-blue-600 shadow-blue-500/40"
+                            : "bg-slate-800 opacity-30 shadow-none"
+                        }`}
+                      >
+                        {loading ? "กำลังบันทึก..." : "ยืนยันชำระเงิน"}
+                      </button>
+                    </div>
+
+                    <div className="rounded-[32px] border border-white/[0.06] bg-[#0d1117] p-8">
+                      <TransferPanel compact={false} />
                     </div>
                   </div>
-                  <p className="text-slate-300 text-sm sm:text-base lg:text-lg font-bold leading-relaxed">
-                    กรุณาตรวจสอบยอดโอนให้เรียบร้อย
-                    <br />
-                    ก่อนกดปุ่มยืนยันด้านล่าง
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
-            {/* ───── STICKY CONFIRM BUTTON — always visible ───── */}
-            <div className="p-3 sm:p-6 lg:p-10 border-t-2 border-white/[0.04] bg-[#0d1117] shrink-0 safe-area-bottom">
+            <div className="safe-area-bottom shrink-0 border-t-2 border-white/[0.04] bg-[#0d1117] p-3 sm:p-6 lg:hidden">
               <button
+                type="button"
                 onClick={handleConfirmCheckout}
                 disabled={loading || !canConfirm}
-                className={`w-full py-3.5 sm:py-6 lg:py-8 rounded-2xl sm:rounded-[40px] font-black text-white text-lg sm:text-2xl lg:text-3xl shadow-2xl active:scale-[0.98] transition-all uppercase italic tracking-tighter ${
+                className={`w-full whitespace-nowrap rounded-2xl py-3.5 text-lg font-black uppercase italic tracking-tighter text-white shadow-2xl transition-all active:scale-[0.98] sm:rounded-[40px] sm:py-6 sm:text-2xl ${
                   canConfirm
                     ? "bg-linear-to-r from-emerald-400 to-blue-600 shadow-blue-500/40"
                     : "bg-slate-800 opacity-30 shadow-none"
                 }`}
               >
-                {loading ? "กำลังบันทึก..." : "🎉 ยืนยันชำระเงิน"}
+                {loading ? "กำลังบันทึก..." : "ยืนยันชำระเงิน"}
               </button>
             </div>
           </>
         ) : (
-          <div className="p-8 sm:p-14 lg:p-20 text-center space-y-5 sm:space-y-8 lg:space-y-10">
-            <div className="w-20 h-20 sm:w-28 sm:h-28 lg:w-32 lg:h-32 bg-emerald-500/10 border-4 border-emerald-500/30 rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/20">
-              <span className="text-4xl sm:text-6xl lg:text-7xl text-emerald-400 scale-150">
+          <div className="space-y-5 p-8 text-center sm:space-y-8 sm:p-14 lg:space-y-10 lg:p-20">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-emerald-500/30 bg-emerald-500/10 shadow-2xl shadow-emerald-500/20 sm:h-28 sm:w-28 lg:h-32 lg:w-32">
+              <span className="scale-150 text-4xl text-emerald-400 sm:text-6xl lg:text-7xl">
                 ✓
               </span>
             </div>
             <div className="space-y-2 sm:space-y-4">
-              <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white italic">
+              <h2 className="text-2xl font-black italic text-white sm:text-4xl lg:text-5xl">
                 ชำระเงินสำเร็จ!
               </h2>
-              <p className="text-slate-400 font-bold text-base sm:text-lg lg:text-xl uppercase tracking-[0.22em]">
+              <p className="text-base font-bold uppercase tracking-[0.22em] text-slate-400 sm:text-lg lg:text-xl">
                 ยินดีด้วย! บันทึกยอดขายเรียบร้อย
               </p>
             </div>
             <button
-              onClick={handleCloseCheckout}
-              className="w-full py-4 sm:py-6 lg:py-8 rounded-2xl sm:rounded-[40px] bg-white text-black font-black text-lg sm:text-2xl lg:text-3xl hover:bg-slate-200 active:scale-[0.98] transition-all shadow-2xl"
+              type="button"
+              onClick={() => {
+                setShowCheckout(false);
+                handleCloseCheckout();
+              }}
+              className="w-full whitespace-nowrap rounded-2xl bg-white py-4 text-lg font-black text-black shadow-2xl transition-all hover:bg-slate-200 active:scale-[0.98] sm:rounded-[40px] sm:py-6 sm:text-2xl lg:py-8 lg:text-3xl"
             >
               กลับไปหน้าขาย
             </button>
@@ -251,3 +370,161 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     </div>
   );
 };
+
+function AmountCard({
+  label,
+  value,
+  accent,
+  border,
+  bg,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+  border: string;
+  bg: string;
+}) {
+  return (
+    <div className="space-y-0.5 sm:space-y-4">
+      <label className="block text-center text-xs font-black uppercase tracking-[0.22em] text-slate-400 sm:text-sm">
+        {label}
+      </label>
+      <div
+        className={`min-h-[44px] break-all rounded-xl border-2 px-2 py-2 text-center text-xl font-black tabular-nums shadow-inner sm:min-h-[100px] sm:rounded-[32px] sm:px-4 sm:py-6 sm:text-4xl ${accent} ${border} ${bg}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function AmountPanel({
+  label,
+  value,
+  accent,
+  border,
+  bg,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+  border: string;
+  bg: string;
+}) {
+  return (
+    <div className={`rounded-[28px] border p-5 ${border} ${bg}`}>
+      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">
+        {label}
+      </p>
+      <p
+        className={`mt-4 break-all text-4xl font-black tabular-nums ${accent}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function NumpadGrid({
+  onPress,
+  mobile = false,
+}: {
+  onPress: (key: (typeof NUMPAD_KEYS)[number]) => void;
+  mobile?: boolean;
+}) {
+  return (
+    <div className={`grid grid-cols-3 ${mobile ? "gap-1 sm:gap-4" : "gap-3"}`}>
+      {NUMPAD_KEYS.map((key) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onPress(key)}
+          className={`${
+            mobile
+              ? "h-10 text-lg sm:h-20 sm:text-3xl"
+              : "h-24 text-4xl xl:h-28"
+          } rounded-xl border-2 font-black transition-all hover:bg-white/[0.08] active:scale-95 sm:rounded-[28px] ${
+            key === "C"
+              ? "border-red-500/20 bg-red-500/10 text-red-400"
+              : "border-white/[0.06] bg-white/[0.04] text-white"
+          }`}
+        >
+          {key}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function QuickCashButtons({
+  amounts,
+  onSelect,
+  mobile = false,
+}: {
+  amounts: readonly number[];
+  onSelect: (amount: number) => void;
+  mobile?: boolean;
+}) {
+  return (
+    <div
+      className={`grid grid-cols-3 ${mobile ? "gap-1.5 sm:grid-cols-5 sm:gap-2" : "gap-2"}`}
+    >
+      {amounts.map((amount) => (
+        <button
+          key={amount}
+          type="button"
+          onClick={() => onSelect(amount)}
+          className={`whitespace-nowrap rounded-lg border border-emerald-500/20 bg-emerald-500/10 font-black text-emerald-400 transition-all hover:bg-emerald-500/20 active:scale-95 ${
+            mobile
+              ? "py-2 text-sm sm:rounded-2xl sm:py-4 sm:text-base"
+              : "rounded-2xl py-3 text-lg"
+          }`}
+        >
+          {amount}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TransferPanel({ compact = true }: { compact?: boolean }) {
+  return (
+    <div
+      className={`text-center ${
+        compact ? "space-y-4 py-6 sm:space-y-8 sm:py-12" : "space-y-6"
+      }`}
+    >
+      <div
+        className={`mx-auto flex items-center justify-center bg-white shadow-2xl ${
+          compact
+            ? "h-36 w-36 rounded-2xl p-5 sm:h-56 sm:w-56 sm:rounded-[40px] sm:p-8"
+            : "h-64 w-64 rounded-[40px] p-8"
+        }`}
+      >
+        <div className="space-y-2 text-center text-black">
+          <div className={compact ? "text-2xl sm:text-4xl" : "text-5xl"}>
+            📱
+          </div>
+          <p
+            className={`font-black italic uppercase leading-tight ${
+              compact ? "text-base sm:text-lg" : "text-xl"
+            }`}
+          >
+            โอนเงินเข้าเครื่อง
+            <br />
+            SCAN QR
+          </p>
+        </div>
+      </div>
+      <p
+        className={`font-bold leading-relaxed text-slate-300 ${
+          compact ? "text-sm sm:text-base lg:text-lg" : "text-lg"
+        }`}
+      >
+        กรุณาตรวจสอบยอดโอนให้เรียบร้อย
+        <br />
+        ก่อนกดปุ่มยืนยันด้านล่าง
+      </p>
+    </div>
+  );
+}

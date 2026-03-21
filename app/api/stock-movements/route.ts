@@ -11,6 +11,7 @@ import {
 } from "../_lib/stockSession";
 
 const ALLOWED_TYPES: StockMovementType[] = [
+  "warehouse_opening",
   "receive_to_warehouse",
   "move_to_storefront",
   "return_to_warehouse",
@@ -26,9 +27,21 @@ interface MovementPayload {
   note?: string;
 }
 
-function normalizePayloads(body: any): MovementPayload[] {
-  if (Array.isArray(body?.movements)) return body.movements;
-  return [body];
+function isMovementPayload(value: unknown): value is MovementPayload {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as Record<string, unknown>;
+  return (
+    typeof payload.sku_code === "string" &&
+    typeof payload.name === "string" &&
+    typeof payload.movement_type === "string"
+  );
+}
+
+function normalizePayloads(body: unknown): MovementPayload[] {
+  if (typeof body === "object" && body && Array.isArray((body as { movements?: unknown[] }).movements)) {
+    return (body as { movements: unknown[] }).movements.filter(isMovementPayload);
+  }
+  return isMovementPayload(body) ? [body] : [];
 }
 
 export async function GET(req: Request) {
@@ -50,9 +63,11 @@ export async function GET(req: Request) {
       success: true,
       movements: filtered,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Unable to load stock movements";
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: message },
       { status: 500 },
     );
   }
@@ -126,7 +141,10 @@ export async function POST(req: Request) {
         );
       }
 
-      if (payload.movement_type === "receive_to_warehouse") {
+      if (
+        payload.movement_type === "warehouse_opening" ||
+        payload.movement_type === "receive_to_warehouse"
+      ) {
         stockItem.warehouseBalance += qty;
       } else if (payload.movement_type === "move_to_storefront") {
         stockItem.warehouseBalance -= qty;
@@ -165,7 +183,7 @@ export async function POST(req: Request) {
       success: true,
       movements: movementsToAdd,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Unable to save stock movements";
     const status =

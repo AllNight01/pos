@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React from "react";
 import { Product } from "./PosTypes";
@@ -8,7 +8,10 @@ interface ProductCardProps {
   onClick: (p: Product) => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product: p, onClick }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({
+  product: p,
+  onClick,
+}) => {
   return (
     <button
       key={p.sku_code}

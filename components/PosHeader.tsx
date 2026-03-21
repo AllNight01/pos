@@ -11,7 +11,10 @@ export const PosHeader: React.FC<PosHeaderProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-30 backdrop-blur-2xl bg-[#0b0f19]/90 border-b-2 border-white/[0.04] px-2.5 sm:px-6 lg:px-10 py-2 sm:py-4 lg:py-6 flex items-center justify-between shadow-2xl safe-area-bottom">
-      <Link href="/" className="flex items-center gap-2 sm:gap-4 group shrink-0">
+      <Link
+        href="/"
+        className="flex items-center gap-2 sm:gap-4 group shrink-0"
+      >
         <div className="w-8 h-8 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl sm:rounded-[20px] bg-linear-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-2xl shadow-cyan-500/30 group-hover:scale-110 active:scale-95 transition-all">
           <span className="text-white text-lg sm:text-2xl lg:text-3xl">🛒</span>
         </div>
@@ -44,13 +47,13 @@ export const PosHeader: React.FC<PosHeaderProps> = ({
         </Link>
         <button
           onClick={onStockSummary}
-          className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs lg:text-sm font-black italic bg-rose-500/10 px-2.5 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-3.5 rounded-lg sm:rounded-full border border-rose-500/20 sm:border-2 hover:bg-rose-500/20 active:scale-90 transition-all text-rose-300 uppercase tracking-wider sm:tracking-widest flex-shrink-0"
+          className="flex flex-shrink-0 items-center gap-1 whitespace-nowrap sm:gap-2 text-[10px] sm:text-xs lg:text-sm font-black italic bg-rose-500/10 px-2.5 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-3.5 rounded-lg sm:rounded-full border border-rose-500/20 sm:border-2 hover:bg-rose-500/20 active:scale-90 transition-all text-rose-300 uppercase tracking-wider sm:tracking-widest"
         >
           📦 <span className="hidden sm:inline">สรุปสต๊อก</span>
         </button>
         <button
           onClick={onSummary}
-          className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs lg:text-sm font-black italic bg-amber-500/10 px-2.5 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-3.5 rounded-lg sm:rounded-full border border-amber-500/20 sm:border-2 hover:bg-amber-500/20 active:scale-90 transition-all text-amber-400 uppercase tracking-wider sm:tracking-widest flex-shrink-0"
+          className="flex flex-shrink-0 items-center gap-1 whitespace-nowrap sm:gap-2 text-[10px] sm:text-xs lg:text-sm font-black italic bg-amber-500/10 px-2.5 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-3.5 rounded-lg sm:rounded-full border border-amber-500/20 sm:border-2 hover:bg-amber-500/20 active:scale-90 transition-all text-amber-400 uppercase tracking-wider sm:tracking-widest"
         >
           📊 <span className="hidden sm:inline">สรุปยอด</span>
         </button>

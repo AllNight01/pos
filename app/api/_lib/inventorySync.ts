@@ -13,6 +13,8 @@ const INVENTORY_HEADERS = [
   "ยอดยกมา",
   "เบิก",
   "นับจริง",
+  "ยอดยกมาคลัง",
+  "รับเข้าคลัง",
 ];
 
 interface ProductMeta {
@@ -34,6 +36,12 @@ interface SalesRow {
   sku_code: string;
   name: string;
   qty: number;
+}
+
+interface InventorySheetRowLike {
+  get: (field: string) => string | number | undefined;
+  set: (field: string, value: string | number) => void;
+  save: () => Promise<void>;
 }
 
 function getKey(skuCode: string, name: string) {
@@ -180,7 +188,7 @@ export async function syncInventorySheetFromMovements(
     ]),
   ).sort(sortDateAsc);
 
-  const existingRows = new Map<string, any>();
+  const existingRows = new Map<string, InventorySheetRowLike>();
   for (const row of inventoryRows) {
     const key = `${String(getRowValue(row, "วันที่")).trim()}::${getKey(
       String(getRowValue(row, "รหัสสินค้า")).trim(),
@@ -203,6 +211,8 @@ export async function syncInventorySheetFromMovements(
       {
         sku_code: string;
         name: string;
+        warehouseOpening: number;
+        receiveToWarehouse: number;
         moveToStorefront: number;
         returnToWarehouse: number;
         latestCount?: number;
@@ -214,11 +224,17 @@ export async function syncInventorySheetFromMovements(
       const current = movementAgg.get(key) || {
         sku_code: movement.sku_code,
         name: movement.name,
+        warehouseOpening: 0,
+        receiveToWarehouse: 0,
         moveToStorefront: 0,
         returnToWarehouse: 0,
       };
 
-      if (movement.movement_type === "move_to_storefront") {
+      if (movement.movement_type === "warehouse_opening") {
+        current.warehouseOpening += movement.qty_piece;
+      } else if (movement.movement_type === "receive_to_warehouse") {
+        current.receiveToWarehouse += movement.qty_piece;
+      } else if (movement.movement_type === "move_to_storefront") {
         current.moveToStorefront += movement.qty_piece;
       } else if (movement.movement_type === "return_to_warehouse") {
         current.returnToWarehouse += movement.qty_piece;
@@ -241,6 +257,8 @@ export async function syncInventorySheetFromMovements(
       const opening = openingByKey.get(key) || 0;
       const moved = movement?.moveToStorefront || 0;
       const returned = movement?.returnToWarehouse || 0;
+      const warehouseOpening = movement?.warehouseOpening || 0;
+      const receiveToWarehouse = movement?.receiveToWarehouse || 0;
       const netWithdraw = moved - returned;
       const sold = daySales.get(key) || 0;
       const expectedClosing = opening + netWithdraw - sold;
@@ -262,6 +280,8 @@ export async function syncInventorySheetFromMovements(
         ยอดยกมา: opening,
         เบิก: netWithdraw,
         นับจริง: closing,
+        ยอดยกมาคลัง: warehouseOpening,
+        รับเข้าคลัง: receiveToWarehouse,
       };
 
       const existing = existingRows.get(rowKey);

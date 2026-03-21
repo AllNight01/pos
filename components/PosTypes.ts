@@ -66,6 +66,7 @@ export interface StockMovement {
   sku_code: string;
   name: string;
   movement_type:
+    | "warehouse_opening"
     | "receive_to_warehouse"
     | "move_to_storefront"
     | "return_to_warehouse"

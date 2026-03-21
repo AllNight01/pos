@@ -26,15 +26,15 @@ export const metadata: Metadata = {
   description: "ระบบขายหน้าร้าน QuickPOS รวดเร็ว สะดวก ง่ายต่อการใช้งาน",
   icons: [
     {
-      rel: 'icon',
-      type: 'image/png',
-      url: '/logo_quickpos.png',
+      rel: "icon",
+      type: "image/png",
+      url: "/logo_quickpos.png",
     },
     {
-      rel: 'apple-touch-icon',
-      type: 'image/png',
-      url: '/logo_quickpos.png',
-    }
+      rel: "apple-touch-icon",
+      type: "image/png",
+      url: "/logo_quickpos.png",
+    },
   ],
 };
 

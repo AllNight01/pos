@@ -6,11 +6,15 @@ import {
   StockMovement,
   StockOverviewData,
   StockOverviewItem,
-  StockSessionSummaryItem,
   StockSession,
 } from "../PosTypes";
+import { SearchableSelect } from "../ui/SearchableSelect";
 
-type StockWorkspaceMode = "warehouse" | "storefront" | "comparison" | "closeout";
+type StockWorkspaceMode =
+  | "warehouse"
+  | "storefront"
+  | "comparison"
+  | "closeout";
 
 interface StockWorkspaceProps {
   mode: StockWorkspaceMode;
@@ -27,25 +31,30 @@ const MODE_COPY: Record<
 > = {
   warehouse: {
     title: "คลังร้าน",
-    description: "เปิดรอบขาย รับของเข้าคลังร้าน และติดตามยอดคงเหลือพร้อมใช้",
+    description:
+      "รับสินค้าเข้าคลังและติดตามยอดคงเหลือของสต๊อกหลังบ้านในรอบขายที่เลือก",
     accent: "from-sky-400 to-cyan-500",
   },
   storefront: {
     title: "หน้าร้าน",
-    description: "เบิกจากคลังร้านไปหน้าร้านได้หลายรอบในวันเดียว และดูยอดคงเหลือปัจจุบัน",
+    description:
+      "เบิกของจากคลังไปหน้าร้านหลายรอบในวันเดียว พร้อมดูยอดคงเหลือหน้าร้านล่าสุด",
     accent: "from-emerald-400 to-lime-500",
   },
   comparison: {
     title: "เปรียบเทียบ",
-    description: "ดูภาพรวมคลังร้าน หน้าร้าน ยอดขาย และส่วนต่างล่าสุดต่อสินค้า",
+    description:
+      "ดูภาพรวมของคลัง หน้าร้าน ยอดขาย และส่วนต่างของสต๊อกตามรอบขายที่เลือก",
     accent: "from-violet-400 to-fuchsia-500",
   },
   closeout: {
     title: "ปิดรอบ",
-    description: "นับหน้าร้านจริง คืนของกลับคลังร้าน และสรุปก่อนปิดรอบขาย",
+    description:
+      "นับสต๊อกหน้าร้านจริง คืนของเข้าคลัง และสรุปข้อมูลก่อนปิดรอบขาย",
     accent: "from-rose-400 to-orange-500",
   },
 };
+
 
 function formatDate(date = new Date()) {
   const th = new Date(date.getTime() + 7 * 60 * 60 * 1000);
@@ -62,6 +71,8 @@ function numericValue(value: string) {
 
 function formatMovementLabel(type: StockMovement["movement_type"]) {
   switch (type) {
+    case "warehouse_opening":
+      return "ยอดยกมาคลัง";
     case "receive_to_warehouse":
       return "รับเข้าคลัง";
     case "move_to_storefront":
@@ -81,17 +92,26 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
     current: null,
     sessions: [],
   });
-  const [selectedComparisonSessionId, setSelectedComparisonSessionId] = useState("");
+  const [selectedComparisonSessionId, setSelectedComparisonSessionId] =
+    useState("");
   const [overview, setOverview] = useState<StockOverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [sessionLabel, setSessionLabel] = useState(
-    `รอบขาย ${formatDate()}`,
-  );
+  const [sessionLabel, setSessionLabel] = useState(`รอบขาย ${formatDate()}`);
+  const [openingInputs, setOpeningInputs] = useState<Record<string, string>>({});
   const [qtyInputs, setQtyInputs] = useState<Record<string, string>>({});
   const [countInputs, setCountInputs] = useState<Record<string, string>>({});
 
   const copy = MODE_COPY[mode];
+  const isViewingHistoricalSession =
+    mode !== "comparison" &&
+    Boolean(sessionData.current?.session_id) &&
+    selectedComparisonSessionId !== sessionData.current?.session_id;
+  const sessionOptions = sessionData.sessions.map((session) => ({
+    value: session.session_id,
+    label: session.label || session.session_id,
+    keywords: `${session.started_at} ${session.closed_at || ""}`.trim(),
+  }));
 
   const inventoryProducts = useMemo(
     () => products.filter((product) => product.is_inventory === true),
@@ -110,6 +130,7 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
     () =>
       overview?.movements.filter(
         (movement) =>
+          movement.movement_type === "warehouse_opening" ||
           movement.movement_type === "receive_to_warehouse" ||
           movement.movement_type === "return_to_warehouse",
       ) || [],
@@ -127,10 +148,9 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const overviewUrl =
-        mode === "comparison" && selectedComparisonSessionId
-          ? `/api/stock-overview?session_id=${encodeURIComponent(selectedComparisonSessionId)}`
-          : "/api/stock-overview";
+      const overviewUrl = selectedComparisonSessionId
+        ? `/api/stock-overview?session_id=${encodeURIComponent(selectedComparisonSessionId)}`
+        : "/api/stock-overview";
       const [productsRes, sessionsRes, overviewRes] = await Promise.all([
         fetch("/api/products"),
         fetch("/api/stock-session"),
@@ -151,7 +171,12 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
           sessions,
         });
         setSelectedComparisonSessionId((prev) => {
-          if (prev && sessions.some((session: StockSession) => session.session_id === prev)) {
+          if (
+            prev &&
+            sessions.some(
+              (session: StockSession) => session.session_id === prev,
+            )
+          ) {
             return prev;
           }
           return current?.session_id || sessions[0]?.session_id || "";
@@ -187,6 +212,10 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
 
   const updateQtyInput = (skuCode: string, value: string) => {
     setQtyInputs((prev) => ({ ...prev, [skuCode]: numericValue(value) }));
+  };
+
+  const updateOpeningInput = (skuCode: string, value: string) => {
+    setOpeningInputs((prev) => ({ ...prev, [skuCode]: numericValue(value) }));
   };
 
   const updateCountInput = (skuCode: string, value: string) => {
@@ -239,12 +268,18 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
   };
 
   const saveMovementDrafts = async (
-    movementType: "receive_to_warehouse" | "move_to_storefront" | "return_to_warehouse",
+    movementType:
+      | "warehouse_opening"
+      | "receive_to_warehouse"
+      | "move_to_storefront"
+      | "return_to_warehouse",
+    inputValues: Record<string, string>,
+    clearInputs: () => void,
   ) => {
     const drafts = inventoryProducts
       .map((product) => ({
         product,
-        qty: Number(qtyInputs[product.sku_code] || 0),
+        qty: Number(inputValues[product.sku_code] || 0),
       }))
       .filter((item) => item.qty > 0);
 
@@ -254,11 +289,15 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
     }
 
     for (const draft of drafts) {
-      const overviewItem = overviewMap.get(draft.product.sku_code || draft.product.name);
+      const overviewItem = overviewMap.get(
+        draft.product.sku_code || draft.product.name,
+      );
       if (movementType === "move_to_storefront") {
         const available = overviewItem?.warehouseBalance || 0;
         if (draft.qty > available) {
-          alert(`เบิกเกินคลังร้านไม่ได้ เหลือ ${available} ชิ้น: ${draft.product.name}`);
+          alert(
+            `เบิกเกินคลังร้านไม่ได้ เหลือ ${available} ชิ้น: ${draft.product.name}`,
+          );
           return;
         }
       }
@@ -266,7 +305,9 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
       if (movementType === "return_to_warehouse") {
         const available = overviewItem?.storefrontBalance || 0;
         if (draft.qty > available) {
-          alert(`คืนเกินหน้าร้านไม่ได้ เหลือ ${available} ชิ้น: ${draft.product.name}`);
+          alert(
+            `คืนเกินหน้าร้านไม่ได้ เหลือ ${available} ชิ้น: ${draft.product.name}`,
+          );
           return;
         }
       }
@@ -279,7 +320,7 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
         movement_type: movementType,
         qty_piece: qty,
       })),
-      () => setQtyInputs({}),
+      clearInputs,
     );
   };
 
@@ -305,9 +346,13 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
       .filter((item) => item.qty > 0);
 
     for (const draft of returnDrafts) {
-      const available = overviewMap.get(draft.product.sku_code || draft.product.name)?.storefrontBalance || 0;
+      const available =
+        overviewMap.get(draft.product.sku_code || draft.product.name)
+          ?.storefrontBalance || 0;
       if (draft.qty > available) {
-        alert(`คืนเกินหน้าร้านไม่ได้ เหลือ ${available} ชิ้น: ${draft.product.name}`);
+        alert(
+          `คืนเกินหน้าร้านไม่ได้ เหลือ ${available} ชิ้น: ${draft.product.name}`,
+        );
         return;
       }
     }
@@ -324,6 +369,46 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
 
     await saveBatchMovements(movements, () => {
       setCountInputs({});
+      setQtyInputs({});
+    });
+  };
+
+  const saveWarehouseDrafts = async () => {
+    const openingDrafts = inventoryProducts
+      .map((product) => ({
+        product,
+        qty: Number(openingInputs[product.sku_code] || 0),
+      }))
+      .filter((item) => item.qty > 0)
+      .map(({ product, qty }) => ({
+        sku_code: product.sku_code,
+        name: product.name,
+        movement_type: "warehouse_opening" as const,
+        qty_piece: qty,
+      }));
+
+    const receiveDrafts = inventoryProducts
+      .map((product) => ({
+        product,
+        qty: Number(qtyInputs[product.sku_code] || 0),
+      }))
+      .filter((item) => item.qty > 0)
+      .map(({ product, qty }) => ({
+        sku_code: product.sku_code,
+        name: product.name,
+        movement_type: "receive_to_warehouse" as const,
+        qty_piece: qty,
+      }));
+
+    const movements = [...openingDrafts, ...receiveDrafts];
+
+    if (movements.length === 0) {
+      alert("ยังไม่มีจำนวนที่กรอก");
+      return;
+    }
+
+    await saveBatchMovements(movements, () => {
+      setOpeningInputs({});
       setQtyInputs({});
     });
   };
@@ -386,8 +471,14 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-base text-slate-200">
-              <p>สินค้าคลังร้านคงเหลือ {overview?.totals.warehouseBalance.toLocaleString() || 0} ชิ้น</p>
-              <p className="mt-1">สินค้าหน้าร้านคงเหลือ {overview?.totals.storefrontBalance.toLocaleString() || 0} ชิ้น</p>
+              <p>
+                สินค้าคลังร้านคงเหลือ{" "}
+                {overview?.totals.warehouseBalance.toLocaleString() || 0} ชิ้น
+              </p>
+              <p className="mt-1">
+                สินค้าหน้าร้านคงเหลือ{" "}
+                {overview?.totals.storefrontBalance.toLocaleString() || 0} ชิ้น
+              </p>
             </div>
           </div>
         </div>
@@ -397,7 +488,8 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
     return (
       <div className="rounded-[28px] border border-dashed border-white/[0.12] bg-white/[0.02] p-5 sm:p-6">
         <p className="text-base font-bold text-slate-200 leading-7">
-          ยังไม่มีรอบขายที่เปิดอยู่ เริ่มจากสร้างรอบก่อน แล้วจึงรับเข้าคลังร้านหรือเบิกไปหน้าร้านได้
+          ยังไม่มีรอบขายที่เปิดอยู่ เริ่มจากสร้างรอบก่อน
+          แล้วจึงรับเข้าคลังร้านหรือเบิกไปหน้าร้านได้
         </p>
         <div className="mt-4 flex flex-col gap-3 md:flex-row">
           <input
@@ -411,7 +503,7 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
             type="button"
             onClick={createSession}
             disabled={submitting}
-            className="rounded-2xl bg-linear-to-r from-cyan-500 to-blue-500 px-5 py-3.5 text-base font-black text-white shadow-lg shadow-cyan-500/20 transition active:scale-[0.98] disabled:opacity-50"
+            className="whitespace-nowrap rounded-2xl bg-linear-to-r from-cyan-500 to-blue-500 px-5 py-3.5 text-base font-black text-white shadow-lg shadow-cyan-500/20 transition active:scale-[0.98] disabled:opacity-50"
           >
             เปิดรอบขาย
           </button>
@@ -454,7 +546,9 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
           <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">
             {metric.label}
           </p>
-          <p className={`mt-3 text-3xl sm:text-4xl font-black tabular-nums ${metric.accent}`}>
+          <p
+            className={`mt-3 text-3xl sm:text-4xl font-black tabular-nums ${metric.accent}`}
+          >
             {metric.value.toLocaleString()}
           </p>
         </div>
@@ -463,20 +557,29 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
   );
 
   const renderProductActionList = (
-    movementType: "receive_to_warehouse" | "move_to_storefront" | "return_to_warehouse",
+    movementType:
+      | "warehouse_opening"
+      | "receive_to_warehouse"
+      | "move_to_storefront"
+      | "return_to_warehouse",
     balanceSelector: (overviewItem: StockOverviewItem | undefined) => number,
     label: string,
     buttonLabel: string,
+    inputLabel: string,
+    inputValues: Record<string, string>,
+    onInputChange: (skuCode: string, value: string) => void,
+    clearInputs: () => void,
     secondaryBalance?: {
       label: string;
       selector: (overviewItem: StockOverviewItem | undefined) => number;
     },
+    secondaryBalanceSide: "left" | "right" = "right",
   ) => (
     <div className="space-y-4">
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-4">
         {inventoryProducts.map((product) => {
           const item = overviewMap.get(product.sku_code || product.name);
-          const qty = qtyInputs[product.sku_code] || "";
+          const qty = inputValues[product.sku_code] || "";
           return (
             <div
               key={product.sku_code}
@@ -495,19 +598,35 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">{product.name}</p>
-                    <p className="mt-1 break-all text-sm font-mono text-slate-400">{product.sku_code}</p>
+                    <p className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
+                      {product.name}
+                    </p>
+                    <p className="mt-1 break-all text-sm font-mono text-slate-400">
+                      {product.sku_code}
+                    </p>
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-3">
                   <div className="flex items-end justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+                    {secondaryBalance && secondaryBalanceSide === "left" ? (
+                      <div className="min-w-0">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                          {secondaryBalance.label}
+                        </p>
+                        <p className="mt-1 text-base font-black tabular-nums text-cyan-300 sm:text-lg">
+                          {secondaryBalance.selector(item).toLocaleString()}
+                        </p>
+                      </div>
+                    ) : null}
+                    <div className={`min-w-0 ${secondaryBalance && secondaryBalanceSide === "left" ? "text-right" : ""}`}>
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                        {label}
+                      </p>
                       <p className="mt-1 text-xl font-black tabular-nums text-white sm:text-2xl">
                         {balanceSelector(item).toLocaleString()}
                       </p>
                     </div>
-                    {secondaryBalance ? (
+                    {secondaryBalance && secondaryBalanceSide === "right" ? (
                       <div className="min-w-0 text-right">
                         <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
                           {secondaryBalance.label}
@@ -521,12 +640,16 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
                 </div>
               </div>
               <div className="mt-4">
+                <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                  {inputLabel}
+                </p>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={qty}
-                  onChange={(e) => updateQtyInput(product.sku_code, e.target.value)}
-                  className="w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-center text-xl font-black text-white outline-none transition focus:border-cyan-500/50"
+                  onChange={(e) => onInputChange(product.sku_code, e.target.value)}
+                  disabled={isViewingHistoricalSession}
+                  className="w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-center text-xl font-black text-white outline-none transition focus:border-cyan-500/50 disabled:opacity-40"
                   placeholder="0"
                 />
               </div>
@@ -535,16 +658,18 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
         })}
       </div>
 
-      <div className="flex justify-end">
+      <div className="fixed inset-x-4 bottom-4 z-40 2xl:left-[calc(300px+2.5rem)] 2xl:right-10">
+        <div className="flex justify-end rounded-[28px] border border-white/[0.08] bg-[#0b0f19]/92 p-3 shadow-2xl shadow-black/40 backdrop-blur-2xl">
         <button
           type="button"
-          onClick={() => saveMovementDrafts(movementType)}
-          disabled={submitting || !sessionData.current}
-          className="rounded-2xl bg-linear-to-r from-cyan-500 to-blue-500 px-5 py-3.5 text-base font-black text-white shadow-lg shadow-cyan-500/20 transition active:scale-[0.98] disabled:opacity-40"
+          onClick={() => saveMovementDrafts(movementType, inputValues, clearInputs)}
+          disabled={submitting || !sessionData.current || isViewingHistoricalSession}
+          className="whitespace-nowrap rounded-2xl bg-linear-to-r from-cyan-500 to-blue-500 px-5 py-3.5 text-base font-black text-white shadow-lg shadow-cyan-500/20 transition active:scale-[0.98] disabled:opacity-40"
         >
           {submitting ? "กำลังบันทึก..." : buttonLabel}
         </button>
       </div>
+    </div>
     </div>
   );
 
@@ -567,7 +692,8 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
                   {movement.name}
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
-                  {formatMovementLabel(movement.movement_type)} • {movement.date}
+                  {formatMovementLabel(movement.movement_type)} •{" "}
+                  {movement.date}
                 </p>
               </div>
               <span className="text-lg font-black tabular-nums text-cyan-300">
@@ -607,21 +733,44 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
           </thead>
           <tbody>
             {overview?.items.map((item) => (
-              <tr key={item.sku_code} className="border-t border-white/[0.05] text-base">
+              <tr
+                key={item.sku_code}
+                className="border-t border-white/[0.05] text-base"
+              >
                 <td className="px-4 py-4">
                   <p className="font-black text-white">{item.name}</p>
                   <p className="mt-1 text-sm text-slate-400">{item.sku_code}</p>
                 </td>
-                <td className="px-4 py-4 font-mono">{item.warehouseOpening.toLocaleString()}</td>
-                <td className="px-4 py-4 font-mono text-sky-300">{item.receivedToWarehouse.toLocaleString()}</td>
-                <td className="px-4 py-4 font-mono text-emerald-300">{item.movedToStorefront.toLocaleString()}</td>
-                <td className="px-4 py-4 font-mono text-violet-300">{item.returnedToWarehouse.toLocaleString()}</td>
-                <td className="px-4 py-4 font-mono text-white">{item.warehouseBalance.toLocaleString()}</td>
-                <td className="px-4 py-4 font-mono text-white">{item.storefrontBalance.toLocaleString()}</td>
-                <td className="px-4 py-4 font-mono text-amber-300">{item.soldToday.toLocaleString()}</td>
-                <td className="px-4 py-4 font-mono text-cyan-300">{item.storefrontExpected.toLocaleString()}</td>
-                <td className="px-4 py-4 font-mono">{item.storefrontActual.toLocaleString()}</td>
-                <td className={`px-4 py-4 font-mono font-black ${item.storefrontDiff >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                <td className="px-4 py-4 font-mono">
+                  {item.warehouseOpening.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 font-mono text-sky-300">
+                  {item.receivedToWarehouse.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 font-mono text-emerald-300">
+                  {item.movedToStorefront.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 font-mono text-violet-300">
+                  {item.returnedToWarehouse.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 font-mono text-white">
+                  {item.warehouseBalance.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 font-mono text-white">
+                  {item.storefrontBalance.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 font-mono text-amber-300">
+                  {item.soldToday.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 font-mono text-cyan-300">
+                  {item.storefrontExpected.toLocaleString()}
+                </td>
+                <td className="px-4 py-4 font-mono">
+                  {item.storefrontActual.toLocaleString()}
+                </td>
+                <td
+                  className={`px-4 py-4 font-mono font-black ${item.storefrontDiff >= 0 ? "text-emerald-300" : "text-rose-300"}`}
+                >
                   {item.storefrontDiff > 0 ? "+" : ""}
                   {item.storefrontDiff.toLocaleString()}
                 </td>
@@ -633,11 +782,123 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
     </div>
   );
 
+  const renderWarehouseActionList = () => (
+    <div className="space-y-4">
+      <div className="grid gap-3 xl:grid-cols-4">
+        {inventoryProducts.map((product) => {
+          const item = overviewMap.get(product.sku_code || product.name);
+          const openingQty = openingInputs[product.sku_code] || "";
+          const receiveQty = qtyInputs[product.sku_code] || "";
+
+          return (
+            <div
+              key={product.sku_code}
+              className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-4 shadow-xl shadow-black/20"
+            >
+              <div className="flex flex-col gap-3 sm:gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/[0.08] bg-[#0d1117] p-2">
+                    <img
+                      src={product.image || "/image/empty.jpg"}
+                      alt={product.name}
+                      className="h-full w-full object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/image/empty.jpg";
+                      }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
+                      {product.name}
+                    </p>
+                    <p className="mt-1 break-all text-sm font-mono text-slate-400">
+                      {product.sku_code}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/[0.08] bg-black/20 px-3 py-3">
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="min-w-0 text-right">
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                        ยอดยกมาคลัง
+                      </p>
+                      <p className="mt-1 text-base font-black tabular-nums text-white sm:text-lg">
+                        {(item?.warehouseOpening || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                        คลังคงเหลือ
+                      </p>
+                      <p className="mt-1 text-xl font-black tabular-nums text-cyan-300 sm:text-2xl">
+                        {(item?.warehouseBalance || 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    ยอดยกมา
+                  </p>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={openingQty}
+                    onChange={(e) =>
+                      updateOpeningInput(product.sku_code, e.target.value)
+                    }
+                    disabled={isViewingHistoricalSession}
+                    className="w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-center text-xl font-black text-white outline-none transition focus:border-cyan-500/50 disabled:opacity-40"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    รับเข้า
+                  </p>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={receiveQty}
+                    onChange={(e) =>
+                      updateQtyInput(product.sku_code, e.target.value)
+                    }
+                    disabled={isViewingHistoricalSession}
+                    className="w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-center text-xl font-black text-white outline-none transition focus:border-cyan-500/50 disabled:opacity-40"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="fixed inset-x-4 bottom-4 z-40 2xl:left-[calc(300px+2.5rem)] 2xl:right-10">
+        <div className="flex flex-col gap-3 rounded-[28px] border border-white/[0.08] bg-[#0b0f19]/92 p-3 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={saveWarehouseDrafts}
+            disabled={submitting || !sessionData.current || isViewingHistoricalSession}
+            className="whitespace-nowrap rounded-2xl bg-linear-to-r from-cyan-500 to-blue-500 px-5 py-3.5 text-base font-black text-white shadow-lg shadow-cyan-500/20 transition active:scale-[0.98] disabled:opacity-40"
+          >
+            {submitting ? "กำลังบันทึก..." : "บันทึก"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderCloseout = () => (
     <div className="space-y-4">
       <div className="rounded-[28px] border border-white/[0.06] bg-white/[0.03] p-4 sm:p-5">
         <p className="text-base font-bold text-slate-200 leading-7">
-          ปิดรอบขายโดยนับหน้าร้านจริงก่อน จากนั้นคืนของกลับเข้าคลังร้านให้ครบ แล้วจึงกดปิดรอบ
+          ปิดรอบขายโดยนับหน้าร้านจริงก่อน จากนั้นคืนของกลับเข้าคลังร้านให้ครบ
+          แล้วจึงกดปิดรอบ
         </p>
       </div>
 
@@ -664,12 +925,18 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
                     />
                   </div>
                   <div className="min-w-0">
-                    <p className="line-clamp-2 text-base font-black leading-tight text-white">{product.name}</p>
-                    <p className="mt-1 break-all text-sm text-slate-400">{product.sku_code}</p>
+                    <p className="line-clamp-2 text-base font-black leading-tight text-white">
+                      {product.name}
+                    </p>
+                    <p className="mt-1 break-all text-sm text-slate-400">
+                      {product.sku_code}
+                    </p>
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/[0.05] bg-black/20 px-3 py-2 text-left sm:text-right">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">ควรเหลือ</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                    ควรเหลือ
+                  </p>
                   <p className="mt-1 text-xl font-black text-cyan-300 sm:text-2xl">
                     {(item?.storefrontExpected || 0).toLocaleString()}
                   </p>
@@ -678,25 +945,35 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-white/[0.05] bg-black/20 p-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">นับจริงหน้าร้าน</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                    นับจริงหน้าร้าน
+                  </p>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={countValue}
-                    onChange={(e) => updateCountInput(product.sku_code, e.target.value)}
-                    className="mt-3 w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-center text-xl font-black text-white outline-none transition focus:border-emerald-500/50"
+                    onChange={(e) =>
+                      updateCountInput(product.sku_code, e.target.value)
+                    }
+                    disabled={isViewingHistoricalSession}
+                    className="mt-3 w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-center text-xl font-black text-white outline-none transition focus:border-emerald-500/50 disabled:opacity-40"
                     placeholder="0"
                   />
                 </div>
 
                 <div className="rounded-2xl border border-white/[0.05] bg-black/20 p-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">คืนเข้าคลังร้าน</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                    คืนเข้าคลังร้าน
+                  </p>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={returnValue}
-                    onChange={(e) => updateQtyInput(product.sku_code, e.target.value)}
-                    className="mt-3 w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-center text-xl font-black text-white outline-none transition focus:border-violet-500/50"
+                    onChange={(e) =>
+                      updateQtyInput(product.sku_code, e.target.value)
+                    }
+                    disabled={isViewingHistoricalSession}
+                    className="mt-3 w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-center text-xl font-black text-white outline-none transition focus:border-violet-500/50 disabled:opacity-40"
                     placeholder="0"
                   />
                 </div>
@@ -713,24 +990,26 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
         })}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+      <div className="fixed inset-x-4 bottom-4 z-40 2xl:left-[calc(300px+2.5rem)] 2xl:right-10">
+        <div className="flex flex-col gap-3 rounded-[28px] border border-white/[0.08] bg-[#0b0f19]/92 p-3 shadow-2xl shadow-black/40 backdrop-blur-2xl sm:flex-row sm:justify-end">
         <button
           type="button"
           onClick={saveCloseoutDrafts}
-          disabled={submitting || !sessionData.current}
-          className="rounded-2xl bg-white/[0.08] px-5 py-3.5 text-base font-black text-white transition active:scale-[0.98] disabled:opacity-40"
+          disabled={submitting || !sessionData.current || isViewingHistoricalSession}
+          className="whitespace-nowrap rounded-2xl bg-white/[0.08] px-5 py-3.5 text-base font-black text-white transition active:scale-[0.98] disabled:opacity-40"
         >
           บันทึกทั้งหมด
         </button>
         <button
           type="button"
           onClick={closeSession}
-          disabled={submitting || !sessionData.current}
-          className="rounded-2xl bg-linear-to-r from-rose-500 to-orange-500 px-5 py-3.5 text-base font-black text-white shadow-lg shadow-rose-500/20 transition active:scale-[0.98] disabled:opacity-40"
+          disabled={submitting || !sessionData.current || isViewingHistoricalSession}
+          className="whitespace-nowrap rounded-2xl bg-linear-to-r from-rose-500 to-orange-500 px-5 py-3.5 text-base font-black text-white shadow-lg shadow-rose-500/20 transition active:scale-[0.98] disabled:opacity-40"
         >
           ปิดรอบขาย
         </button>
       </div>
+    </div>
     </div>
   );
 
@@ -751,23 +1030,18 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
                 : "เลือกดูสรุปตามรอบการขายได้จากรายการด้านขวา"}
             </p>
           </div>
-          <label className="block">
-            <span className="mb-2 block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-              เลือกรอบขาย
-            </span>
-            <select
-              value={selectedComparisonSessionId}
-              onChange={(e) => setSelectedComparisonSessionId(e.target.value)}
-              className="min-w-[260px] rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-violet-500/50"
-            >
-              {sessionData.sessions.map((session) => (
-                <option key={session.session_id} value={session.session_id}>
-                  {session.label || session.session_id} ({session.started_at}
-                  {session.closed_at ? ` - ${session.closed_at}` : ""})
-                </option>
-              ))}
-            </select>
-          </label>
+          <SearchableSelect
+            className="min-w-[260px]"
+            label="เลือกรอบขาย"
+            value={selectedComparisonSessionId}
+            onChange={setSelectedComparisonSessionId}
+            options={sessionOptions.map((session) => ({
+              ...session,
+              label: `${session.label} (${session.keywords})`,
+            }))}
+            placeholder="เลือกรอบขาย"
+            searchPlaceholder="ค้นหารอบขาย..."
+          />
         </div>
       </div>
 
@@ -809,7 +1083,9 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
             <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">
               {metric.label}
             </p>
-            <p className={`mt-3 text-3xl sm:text-4xl font-black tabular-nums ${metric.accent}`}>
+            <p
+              className={`mt-3 text-3xl sm:text-4xl font-black tabular-nums ${metric.accent}`}
+            >
               {metric.value.toLocaleString()}
             </p>
           </div>
@@ -821,7 +1097,14 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
           <table className="min-w-full text-left">
             <thead className="bg-[#0d1117] text-xs uppercase tracking-[0.18em] text-slate-400">
               <tr>
-                {["สินค้า", "เบิก", "ขาย", "ควรเหลือ", "นับจริง", "ส่วนต่าง"].map((header) => (
+                {[
+                  "สินค้า",
+                  "เบิก",
+                  "ขาย",
+                  "ควรเหลือ",
+                  "นับจริง",
+                  "ส่วนต่าง",
+                ].map((header) => (
                   <th key={header} className="px-4 py-4 font-black">
                     {header}
                   </th>
@@ -836,7 +1119,9 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
                 >
                   <td className="px-4 py-4">
                     <p className="font-black text-white">{item.name}</p>
-                    <p className="mt-1 text-sm text-slate-400">{item.sku_code}</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {item.sku_code}
+                    </p>
                   </td>
                   <td className="px-4 py-4 font-mono text-cyan-300">
                     {item.withdrawn.toLocaleString()}
@@ -850,7 +1135,9 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
                   <td className="px-4 py-4 font-mono text-emerald-300">
                     {item.counted.toLocaleString()}
                   </td>
-                  <td className={`px-4 py-4 font-mono font-black ${item.diff >= 0 ? "text-violet-300" : "text-rose-300"}`}>
+                  <td
+                    className={`px-4 py-4 font-mono font-black ${item.diff >= 0 ? "text-violet-300" : "text-rose-300"}`}
+                  >
                     {item.diff > 0 ? "+" : ""}
                     {item.diff.toLocaleString()}
                   </td>
@@ -864,21 +1151,42 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-32">
       <section className="overflow-hidden rounded-[32px] border border-white/[0.06] bg-linear-to-br from-white/[0.04] via-white/[0.03] to-white/[0.01] p-5 shadow-2xl shadow-black/30 sm:p-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <span className={`inline-flex items-center rounded-full bg-linear-to-r px-3 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-black ${copy.accent}`}>
+            <span
+              className={`inline-flex items-center rounded-full bg-linear-to-r px-3 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-black ${copy.accent}`}
+            >
               Stock Session
             </span>
-            <h2 className="mt-3 text-2xl font-black text-white sm:text-3xl">{copy.title}</h2>
-            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-300">{copy.description}</p>
+            <h2 className="mt-3 text-2xl font-black text-white sm:text-3xl">
+              {copy.title}
+            </h2>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-slate-300">
+              {copy.description}
+            </p>
           </div>
-          <div className="rounded-[24px] border border-white/[0.06] bg-black/20 px-4 py-3 text-base text-slate-300">
+          <div className="grid gap-3 lg:min-w-[360px]">
+            <SearchableSelect
+              value={selectedComparisonSessionId}
+              onChange={setSelectedComparisonSessionId}
+              options={sessionOptions}
+              placeholder="เลือกรอบขาย"
+              searchPlaceholder="ค้นหารอบขาย..."
+            />
+            <div className="rounded-[24px] border border-white/[0.06] bg-black/20 px-4 py-3 text-base text-slate-300">
             วันนี้ {formatDate()}
           </div>
         </div>
+        </div>
       </section>
+
+      {isViewingHistoricalSession && (
+        <div className="rounded-[28px] border border-amber-500/20 bg-amber-500/10 px-5 py-4 text-base font-bold text-amber-100">
+          กำลังดูข้อมูลของรอบขายอื่นอยู่ จึงปิดโหมดแก้ไขชั่วคราว หากต้องการบันทึกข้อมูล ให้สลับกลับมาที่รอบขายปัจจุบัน
+        </div>
+      )}
 
       {renderSessionBanner()}
       {renderMetricCards()}
@@ -889,13 +1197,11 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
         </div>
       ) : mode === "warehouse" ? (
         <div className="space-y-4">
-          {renderProductActionList(
-            "receive_to_warehouse",
-            (item) => item?.warehouseBalance || 0,
-            "คลังร้านคงเหลือ",
-            "รับเข้าคลัง",
+          {renderWarehouseActionList()}
+          {renderMovements(
+            warehouseMovements,
+            "ยังไม่มีรายการรับเข้า/คืนเข้าคลังร้านในรอบนี้",
           )}
-          {renderMovements(warehouseMovements, "ยังไม่มีรายการรับเข้า/คืนเข้าคลังร้านในรอบนี้")}
         </div>
       ) : mode === "storefront" ? (
         <div className="space-y-4">
@@ -904,12 +1210,20 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
             (item) => item?.storefrontBalance || 0,
             "หน้าร้านคงเหลือ",
             "เบิกไปหน้าร้าน",
+            "กรอกจำนวนเบิก",
+            qtyInputs,
+            updateQtyInput,
+            () => setQtyInputs({}),
             {
-              label: "ในคลัง",
+              label: "ในคลังรวม",
               selector: (item) => item?.warehouseBalance || 0,
             },
+            "left",
           )}
-          {renderMovements(storefrontMovements, "ยังไม่มีรายการเบิกจากคลังร้านไปหน้าร้านในรอบนี้")}
+          {renderMovements(
+            storefrontMovements,
+            "ยังไม่มีรายการเบิกจากคลังร้านไปหน้าร้านในรอบนี้",
+          )}
         </div>
       ) : mode === "comparison" ? (
         renderSessionSummaryComparison()
@@ -919,3 +1233,6 @@ export function StockWorkspace({ mode }: StockWorkspaceProps) {
     </div>
   );
 }
+
+
+

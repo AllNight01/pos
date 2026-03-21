@@ -48,7 +48,11 @@ export default function ProductManagementPage() {
           setForm(buildForm(nextProducts[0]));
         }
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "โหลดรายการสินค้าไม่สำเร็จ");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "โหลดรายการสินค้าไม่สำเร็จ",
+        );
       } finally {
         setLoading(false);
       }
@@ -69,7 +73,9 @@ export default function ProductManagementPage() {
   }, [products, search]);
 
   const selectedProduct =
-    products.find((product) => product.sku_code === selectedSku) || filteredProducts[0] || null;
+    products.find((product) => product.sku_code === selectedSku) ||
+    filteredProducts[0] ||
+    null;
 
   useEffect(() => {
     if (selectedProduct) {
@@ -98,8 +104,10 @@ export default function ProductManagementPage() {
   };
 
   const handleFormChange =
-    (field: keyof ProductFormState) => (event: ChangeEvent<HTMLInputElement>) => {
-      const nextValue = field === "is_active" ? event.target.checked : event.target.value;
+    (field: keyof ProductFormState) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const nextValue =
+        field === "is_active" ? event.target.checked : event.target.value;
       setForm((current) => ({ ...current, [field]: nextValue }));
     };
 
@@ -145,7 +153,11 @@ export default function ProductManagementPage() {
       );
       setMessage("บันทึกข้อมูลสินค้าเรียบร้อย");
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "บันทึกสินค้าไม่สำเร็จ");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "บันทึกสินค้าไม่สำเร็จ",
+      );
     } finally {
       setSaving(false);
     }
@@ -184,7 +196,11 @@ export default function ProductManagementPage() {
       setSelectedFile(null);
       setMessage("อัปโหลดรูปแล้ว และบันทึก URL ลง Google Sheet เรียบร้อย");
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "อัปโหลดรูปไม่สำเร็จ");
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "อัปโหลดรูปไม่สำเร็จ",
+      );
     } finally {
       setUploading(false);
     }
@@ -203,7 +219,8 @@ export default function ProductManagementPage() {
                 Product Tools
               </p>
               <p className="mt-2 text-base text-slate-300">
-                จัดการข้อมูลสินค้า เปิดหรือปิดการขาย และดูอันดับสินค้าขายดีได้จากหมวดนี้
+                จัดการข้อมูลสินค้า เปิดหรือปิดการขาย
+                และดูอันดับสินค้าขายดีได้จากหมวดนี้
               </p>
             </div>
             <Link
@@ -228,7 +245,10 @@ export default function ProductManagementPage() {
               className="mt-3 w-full rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3 text-base text-white outline-none transition focus:border-cyan-500/50"
             />
 
-            <div className="mt-4 max-h-[65dvh] space-y-3 overflow-y-auto pr-1" style={{ scrollbarWidth: "thin" }}>
+            <div
+              className="mt-4 max-h-[65dvh] space-y-3 overflow-y-auto pr-1"
+              style={{ scrollbarWidth: "thin" }}
+            >
               {loading ? (
                 <div className="rounded-2xl border border-white/[0.05] bg-black/20 p-4 text-base text-slate-400">
                   กำลังโหลดสินค้า...
@@ -257,13 +277,16 @@ export default function ProductManagementPage() {
                           alt={product.name}
                           className="h-full w-full object-contain"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = "/image/empty.jpg";
+                            (e.target as HTMLImageElement).src =
+                              "/image/empty.jpg";
                           }}
                         />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="line-clamp-2 text-base font-black text-white">{product.name}</p>
+                          <p className="line-clamp-2 text-base font-black text-white">
+                            {product.name}
+                          </p>
                           <span
                             className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black uppercase tracking-[0.16em] ${
                               product.is_active !== false
@@ -274,7 +297,9 @@ export default function ProductManagementPage() {
                             {product.is_active !== false ? "เปิด" : "ปิด"}
                           </span>
                         </div>
-                        <p className="mt-1 break-all text-sm text-slate-400">{product.sku_code}</p>
+                        <p className="mt-1 break-all text-sm text-slate-400">
+                          {product.sku_code}
+                        </p>
                       </div>
                     </button>
                   );
@@ -294,12 +319,17 @@ export default function ProductManagementPage() {
                         alt={selectedProduct.name}
                         className="h-full w-full object-contain"
                         onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/image/empty.jpg";
+                          (e.target as HTMLImageElement).src =
+                            "/image/empty.jpg";
                         }}
                       />
                     </div>
-                    <p className="mt-4 text-lg font-black text-white">{selectedProduct.name}</p>
-                    <p className="mt-1 break-all text-sm text-slate-400">{selectedProduct.sku_code}</p>
+                    <p className="mt-4 text-lg font-black text-white">
+                      {selectedProduct.name}
+                    </p>
+                    <p className="mt-1 break-all text-sm text-slate-400">
+                      {selectedProduct.sku_code}
+                    </p>
                     <p className="mt-2 text-sm text-slate-300">
                       สถานะ: {form.is_active ? "เปิดใช้งาน" : "ปิดการขาย"}
                     </p>
@@ -355,7 +385,9 @@ export default function ProductManagementPage() {
 
                     <label className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-[#0d1117] px-4 py-3">
                       <div>
-                        <p className="text-base font-black text-white">เปิดใช้งานสินค้า</p>
+                        <p className="text-base font-black text-white">
+                          เปิดใช้งานสินค้า
+                        </p>
                         <p className="mt-1 text-sm text-slate-400">
                           ถ้าปิด สินค้าจะไม่แสดงในหน้าขาย
                         </p>
@@ -395,7 +427,8 @@ export default function ProductManagementPage() {
                         อัปโหลดรูปสินค้า
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-300">
-                        ย่อส่วนอัปโหลดรูปให้เล็กลงแล้ว ใช้สำหรับเปลี่ยนรูปอย่างเดียว
+                        ย่อส่วนอัปโหลดรูปให้เล็กลงแล้ว
+                        ใช้สำหรับเปลี่ยนรูปอย่างเดียว
                       </p>
                     </div>
                     {selectedProduct.image && (
@@ -414,7 +447,9 @@ export default function ProductManagementPage() {
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                      onChange={(e) =>
+                        setSelectedFile(e.target.files?.[0] || null)
+                      }
                       className="block w-full rounded-2xl border border-dashed border-white/[0.1] bg-[#0d1117] px-4 py-3 text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-cyan-500 file:px-4 file:py-2 file:text-sm file:font-black file:text-black"
                     />
                     <button
